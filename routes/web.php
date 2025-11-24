@@ -4,6 +4,7 @@ use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
+
 /*
 |--------------------------------------------------------------------------
 | Controllers
@@ -51,7 +52,15 @@ Route::middleware('auth')->group(function () {
     Route::patch ('/profile',  [ProfileController::class, 'update' ])->name('profile.update');
     Route::delete('/profile',  [ProfileController::class, 'destroy'])->name('profile.destroy');
 
+// En routes/web.php
 
+
+// ... tus otras rutas ...
+
+// Rutas para edición avanzada (NUEVAS)
+Route::put('/prestamos/{prestamo}/estado', [PrestamoController::class, 'updateEstado'])->name('prestamos.updateEstado');
+Route::put('/pagos/{pago}', [PagoController::class, 'update'])->name('pagos.update');
+Route::delete('/pagos/{pago}', [PagoController::class, 'destroy'])->name('pagos.destroy'); // Por si necesitas borrar un pago mal hecho
 
 Route::get('/estadisticas', [EstadisticasController::class, 'index'])->name('estadisticas');
 

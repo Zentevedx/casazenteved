@@ -7,6 +7,9 @@ use App\Models\Articulo;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Barryvdh\DomPDF\Facade\Pdf;
+use App\Models\Cliente;
+use Inertia\Inertia;
+use Illuminate\Support\Str;
 
 class PrestamoController extends Controller
 {
@@ -162,5 +165,17 @@ public function actualizarBasico(Request $request, Prestamo $prestamo)
         $pdf = Pdf::loadView('pdf.boleta-prestamo', compact('prestamo'));
 
         return $pdf->stream('boleta-' . $prestamo->codigo . '.pdf');
+    }
+    public function updateEstado(Request $request, Prestamo $prestamo)
+    {
+        $request->validate([
+            'estado' => 'required|in:Activo,Pagado,Vencido,Cancelado'
+        ]);
+
+        $prestamo->update([
+            'estado' => $request->estado
+        ]);
+
+        return back()->with('success', 'Estado del préstamo actualizado correctamente.');
     }
 }

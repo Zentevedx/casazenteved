@@ -14,16 +14,29 @@ class DashboardController extends Controller
         // 1. VERIFICACIÓN AUTOMÁTICA (Mismo código de antes)
         $prestamosParaVerificar = Prestamo::where('estado', 'Activo')->with('pagos')->get();
         foreach ($prestamosParaVerificar as $prestamo) {
-            $totalCapitalPagado = $prestamo->pagos->where('tipo_pago', 'Capital')->sum('monto_pagado');
-            
+            // REGLA 1: El Capital MATA el préstamo (lo paga)
+            $totalCapitalPagado = $prestamo->pagos
+                ->where('tipo_pago', 'Capital')
+                ->sum('monto_pagado'); 
+
+            // Si pagó el capital completo (con margen de error de 0.10 ctvs)
             if ($totalCapitalPagado >= ($prestamo->monto - 0.1)) {
                 $prestamo->update(['estado' => 'Pagado']);
-                continue; 
+                continue; // Se cerró, pasamos al siguiente
             }
 
-            $ultimoPagoInteres = $prestamo->pagos->where('tipo_pago', 'Interes')->sortByDesc('fecha_pago')->first();
-            $fechaReferencia = $ultimoPagoInteres ? Carbon::parse($ultimoPagoInteres->fecha_pago) : Carbon::parse($prestamo->fecha_prestamo);
+            // REGLA 2: Solo el INTERÉS da vida (reinicia el contador)
+            $ultimoPagoInteres = $prestamo->pagos
+                ->where('tipo_pago', 'Interes')
+                ->sortByDesc('fecha_pago')
+                ->first();
 
+            // La fecha base es el último interés pagado O la fecha original del préstamo
+            $fechaReferencia = $ultimoPagoInteres 
+                ? Carbon::parse($ultimoPagoInteres->fecha_pago) 
+                : Carbon::parse($prestamo->fecha_prestamo);
+
+            // Si pasaron 3 meses desde esa fecha sin nuevo interés -> VENCIDO
             if ($fechaReferencia->diffInMonths(Carbon::now()) >= 3) {
                 $prestamo->update(['estado' => 'Vencido']);
             }
