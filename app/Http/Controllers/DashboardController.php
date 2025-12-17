@@ -11,8 +11,9 @@ class DashboardController extends Controller
 {
     public function index(Request $request) 
     {
-        // 1. VERIFICACIÓN AUTOMÁTICA (Mismo código de antes)
+        // 1. VERIFICACIÓN AUTOMÁTICA (Reglas de Negocio)
         $prestamosParaVerificar = Prestamo::where('estado', 'Activo')->with('pagos')->get();
+        
         foreach ($prestamosParaVerificar as $prestamo) {
             // REGLA 1: El Capital MATA el préstamo (lo paga)
             $totalCapitalPagado = $prestamo->pagos
@@ -42,9 +43,9 @@ class DashboardController extends Controller
             }
         }
 
-        // 2. PREPARACIÓN DE DATOS
+        // 2. PREPARACIÓN DE DATOS PARA LA VISTA
         $estadoFiltro = $request->input('estado', 'Activo'); 
-        $query = Prestamo::with(['cliente', 'pagos', 'articulos']); // 'articulos' ya estaba, perfecto.
+        $query = Prestamo::with(['cliente', 'pagos', 'articulos']);
 
         if ($estadoFiltro !== 'Todos') {
             $query->where('estado', $estadoFiltro);
@@ -70,9 +71,12 @@ class DashboardController extends Controller
             // Lógica de fechas
             $numPagosInteres = $pagosInteres->count();
             $fechaBase = Carbon::parse($prestamo->fecha_prestamo);
+            
+            // Calculamos la próxima fecha de pago basada en cuántos meses de interés ha pagado
             $fechaReferenciaProximo = $fechaBase->copy()->addMonths($numPagosInteres);
             $fechaProximoPago = $fechaReferenciaProximo->copy()->addMonth();
 
+            // Determinamos si está en mora técnica (incluso si está "Activo")
             $estaEnMora = $prestamo->estado === 'Vencido' || 
                           ($prestamo->estado === 'Activo' && $fechaProximoPago->lt(Carbon::now()->startOfDay()));
             
@@ -82,7 +86,7 @@ class DashboardController extends Controller
             $totalInteresesGenerados += $interesesGenerados;
             if ($estaEnMora) $prestamosEnMora++;
 
-            // --- NUEVO: Formatear Historial de Intereses ---
+            // Formatear Historial de Intereses para el frontend
             $historialIntereses = $pagosInteres->sortByDesc('fecha_pago')->map(function($pago) {
                 return [
                     'id' => $pago->id,
@@ -91,34 +95,33 @@ class DashboardController extends Controller
                 ];
             })->values();
 
-            // --- NUEVO: Formatear Lista de Artículos ---
+            // Formatear Lista de Artículos para el frontend
             $listaArticulos = $prestamo->articulos->map(function($art) {
                 return [
                     'nombre' => $art->nombre_articulo,
-                    // Asumiendo que tienes campos como 'descripcion', 'marca' o 'observaciones'
-                    // Concatenamos para mostrar un texto completo
                     'detalle' => $art->descripcion . ($art->marca ? ' - ' . $art->marca : '') . ($art->modelo ? ' (' . $art->modelo . ')' : ''),
                 ];
             });
 
+            // Construcción del objeto final
             $prestamosProcesados[] = [
                 'id' => $prestamo->id,
                 'codigo' => $prestamo->codigo,
                 'monto' => $prestamo->monto,
                 'estado' => $prestamo->estado, 
                 'cliente_nombre' => $prestamo->cliente->nombre ?? 'Desconocido',
+                'cliente_id' => $prestamo->cliente->id ?? null, // <--- CAMBIO CLAVE AQUI
                 'fecha_prestamo' => $fechaBase->toDateString(), 
                 'fecha_proximo_pago' => $fechaProximoPago->toDateString(),
                 'capital_recuperado' => $capitalRecuperado,
                 'intereses_generados' => $interesesGenerados,
                 'esta_en_mora' => $estaEnMora,
-                // DATOS NUEVOS ENVIADOS AL VUE
                 'historial_intereses' => $historialIntereses,
                 'articulos' => $listaArticulos,
             ];
         }
         
-        // Agrupación (sin cambios en la lógica, solo pasamos los nuevos datos)
+        // 3. AGRUPACIÓN (Mes -> Semana)
         $reporteAgrupado = collect($prestamosProcesados)
             ->groupBy(fn($item) => Carbon::parse($item['fecha_prestamo'])->format('Y-m'))
             ->map(function ($prestamosDelMes, $mesAnio) {
@@ -126,6 +129,7 @@ class DashboardController extends Controller
                     ->groupBy(fn($item) => Carbon::parse($item['fecha_prestamo'])->weekOfYear)
                     ->map(function ($prestamosDeLaSemana, $numeroSemana) use ($mesAnio) {
                         $anio = substr($mesAnio, 0, 4);
+                        // Calculamos inicio y fin de la semana para mostrar rango
                         $fechaInicioSemana = Carbon::now()->setISODate($anio, $numeroSemana, 1)->startOfDay(); 
                         $fechaFinSemana = Carbon::now()->setISODate($anio, $numeroSemana, 7)->endOfDay(); 
 
@@ -153,6 +157,7 @@ class DashboardController extends Controller
                 ];
             })->sortByDesc('mes_anio')->values();
 
+        // 4. RESPUESTA A INERTIA
         return Inertia::render('Dashboard', [
             'reporteAgrupado' => $reporteAgrupado,
             'estadoFiltro' => $estadoFiltro,

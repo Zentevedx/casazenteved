@@ -151,7 +151,7 @@
   </div>
   <div class="col-6 empresa-info">
     <strong>CASA DE EMPEÑOS</strong><br>
-    Av. Panamericana / Av. Martires de la Democracia<br>
+    Av. Panamericana / Av. V. de Loreto<br>
     Whatsapp: 60763882<br>
     NIT: 8420256011
   </div>
@@ -196,7 +196,8 @@
         <tr>
           <td>{{ $i + 1 }}</td>
           <td>{{ $articulo->nombre_articulo }}</td>
-          <td>{{ $articulo->descripcion }}</td>
+          <td>{{ $articulo->
+          descripcion }}</td>
         </tr>
       @endforeach
     </tbody>

@@ -4,10 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Models\Prestamo;
 use App\Models\Articulo;
+use App\Models\Caja; // <--- IMPORTANTE: Modelo Caja importado
+use App\Models\Cliente;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Barryvdh\DomPDF\Facade\Pdf;
-use App\Models\Cliente;
 use Inertia\Inertia;
 use Illuminate\Support\Str;
 
@@ -39,8 +40,6 @@ class PrestamoController extends Controller
         return inertia('Prestamos/Create', compact('clientes'));
     }
 
-   
-
     public function edit(Prestamo $prestamo)
     {
         $prestamo->load('articulos', 'cliente');
@@ -52,112 +51,122 @@ class PrestamoController extends Controller
         ]);
     }
 
- public function store(Request $request)
-{
-    $request->validate([
-        'codigo' => 'required|string|unique:prestamos,codigo',
-        'cliente_id' => 'required|exists:clientes,id',
-        'monto' => 'required|numeric|min:0',
-        'fecha_prestamo' => 'required|date',
-        'multa_por_retraso' => 'required|numeric|min:0', // Multa por retraso
-    ]);
-
-    DB::transaction(function () use ($request) {
-        $prestamo = Prestamo::create([
-            'codigo' => $request->codigo,
-            'cliente_id' => $request->cliente_id,
-            'monto' => $request->monto,
-            'fecha_prestamo' => $request->fecha_prestamo,
-            'multa_por_retraso' => $request->multa_por_retraso, // Guardamos la multa por retraso
+    public function store(Request $request)
+    {
+        $request->validate([
+            'codigo' => 'required|string|unique:prestamos,codigo',
+            'cliente_id' => 'required|exists:clientes,id',
+            'monto' => 'required|numeric|min:0',
+            'fecha_prestamo' => 'required|date',
+            'multa_por_retraso' => 'required|numeric|min:0',
         ]);
 
-        foreach ($request->articulos as $articulo) {
-            $fotoPath = null;
-            if (isset($articulo['foto_url']) && is_file($articulo['foto_url'])) {
-                $fotoPath = $articulo['foto_url']->store('articulos', 'public');
+        DB::transaction(function () use ($request) {
+            // 1. Crear el Préstamo
+            $prestamo = Prestamo::create([
+                'codigo' => $request->codigo,
+                'cliente_id' => $request->cliente_id,
+                'monto' => $request->monto,
+                'fecha_prestamo' => $request->fecha_prestamo,
+                'multa_por_retraso' => $request->multa_por_retraso,
+            ]);
+
+            // Guardar artículos
+            foreach ($request->articulos as $articulo) {
+                $fotoPath = null;
+                if (isset($articulo['foto_url']) && is_file($articulo['foto_url'])) {
+                    $fotoPath = $articulo['foto_url']->store('articulos', 'public');
+                }
+
+                $prestamo->articulos()->create([
+                    'nombre_articulo' => strtoupper($articulo['nombre_articulo']),
+                    'descripcion' => strtoupper($articulo['descripcion']),
+                    'foto_url' => $fotoPath,
+                ]);
             }
 
-            $prestamo->articulos()->create([
-                'nombre_articulo' => strtoupper($articulo['nombre_articulo']),
-                'descripcion' => strtoupper($articulo['descripcion']),
-                'foto_url' => $fotoPath,
+            // 2. AUTOMATIZACIÓN CAJA: Registrar Salida (Egreso)
+            // Obtenemos el saldo actual para calcular el nuevo
+            $ultimoSaldo = Caja::latest('id')->value('saldo_caja') ?? 0;
+
+            Caja::create([
+                'tipo_movimiento' => 'Egreso',
+                'origen'          => 'Prestamo',
+                'descripcion'     => "Préstamo otorgado: {$prestamo->codigo}",
+                'monto'           => $prestamo->monto,
+                'saldo_caja'      => $ultimoSaldo - $prestamo->monto, // Restamos el dinero
+                'fecha'           => $prestamo->fecha_prestamo,
+                'referencia_id'   => $prestamo->id,
+                'referencia_tabla'=> 'prestamos',
             ]);
-        }
-    });
+        });
 
-    return redirect()->route('prestamos.index')->with('success', 'Préstamo creado correctamente.');
-}
+        return redirect()->route('prestamos.index')->with('success', 'Préstamo creado y dinero descontado de caja.');
+    }
 
-public function update(Request $request, Prestamo $prestamo)
-{
-    // Validación de los campos
-    $request->validate([
-        'codigo' => 'required|string|unique:prestamos,codigo,' . $prestamo->id,
-        'cliente_id' => 'required|exists:clientes,id',  // Asegurarse de que el cliente existe
-        'monto' => 'required|numeric|min:0',
-        'fecha_prestamo' => 'required|date',
-        'multa_por_retraso' => 'required|numeric|min:0', // Multa por retraso
-    ]);
+    public function update(Request $request, Prestamo $prestamo)
+    {
+        $request->validate([
+            'codigo' => 'required|string|unique:prestamos,codigo,' . $prestamo->id,
+            'cliente_id' => 'required|exists:clientes,id',
+            'monto' => 'required|numeric|min:0',
+            'fecha_prestamo' => 'required|date',
+            'multa_por_retraso' => 'required|numeric|min:0',
+        ]);
 
-    DB::transaction(function () use ($request, $prestamo) {
-        // Actualizar los datos del préstamo
+        DB::transaction(function () use ($request, $prestamo) {
+            // Nota: Si cambias el monto aquí, idealmente deberías ajustar la caja también.
+            // Por simplicidad, esta actualización solo toca el préstamo y sus artículos.
+            
+            $prestamo->update([
+                'codigo' => $request->codigo,
+                'cliente_id' => $request->cliente_id,
+                'monto' => $request->monto,
+                'fecha_prestamo' => $request->fecha_prestamo,
+                'multa_por_retraso' => $request->multa_por_retraso,
+            ]);
+
+            $prestamo->articulos()->delete();
+
+            foreach ($request->articulos as $articulo) {
+                $fotoPath = null;
+                if (isset($articulo['foto_url']) && is_file($articulo['foto_url'])) {
+                    $fotoPath = $articulo['foto_url']->store('articulos', 'public');
+                } elseif (is_string($articulo['foto_url'])) {
+                    $fotoPath = $articulo['foto_url'];
+                }
+
+                $prestamo->articulos()->create([
+                    'nombre_articulo' => strtoupper($articulo['nombre_articulo']),
+                    'descripcion' => strtoupper($articulo['descripcion']),
+                    'foto_url' => $fotoPath,
+                ]);
+            }
+        });
+
+        return redirect()->route('prestamos.index')->with('success', 'Préstamo actualizado correctamente.');
+    }
+
+    public function actualizarBasico(Request $request, Prestamo $prestamo)
+    {
+        $request->validate([
+            'codigo' => 'required|string',
+            'cliente_id' => 'required|exists:clientes,id',
+            'monto' => 'required|numeric|min:0',
+            'fecha_prestamo' => 'required|date',
+            'multa_por_retraso' => 'required|numeric|min:0',
+        ]);
+
         $prestamo->update([
             'codigo' => $request->codigo,
             'cliente_id' => $request->cliente_id,
             'monto' => $request->monto,
             'fecha_prestamo' => $request->fecha_prestamo,
-            'multa_por_retraso' => $request->multa_por_retraso, // Guardamos la multa por retraso
+            'multa_por_retraso' => $request->multa_por_retraso,
         ]);
 
-        // Eliminar los artículos existentes antes de agregar los nuevos
-        $prestamo->articulos()->delete();
-
-        // Crear nuevos artículos
-        foreach ($request->articulos as $articulo) {
-            $fotoPath = null;
-            if (isset($articulo['foto_url']) && is_file($articulo['foto_url'])) {
-                // Guardar la foto del artículo en el almacenamiento
-                $fotoPath = $articulo['foto_url']->store('articulos', 'public');
-            } elseif (is_string($articulo['foto_url'])) {
-                $fotoPath = $articulo['foto_url'];  // Si ya es una URL, la guardamos tal cual
-            }
-
-            // Crear el artículo asociado al préstamo
-            $prestamo->articulos()->create([
-                'nombre_articulo' => strtoupper($articulo['nombre_articulo']),
-                'descripcion' => strtoupper($articulo['descripcion']),
-                'foto_url' => $fotoPath,
-            ]);
-        }
-    });
-
-    // Redirigir a la lista de préstamos con mensaje de éxito
-    return redirect()->route('prestamos.index')->with('success', 'Préstamo actualizado correctamente.');
-}
-
-
-public function actualizarBasico(Request $request, Prestamo $prestamo)
-{
-    $request->validate([
-        'codigo' => 'required|string',
-        'cliente_id' => 'required|exists:clientes,id',
-        'monto' => 'required|numeric|min:0',
-        'fecha_prestamo' => 'required|date',
-        'multa_por_retraso' => 'required|numeric|min:0',
-    ]);
-
-    $prestamo->update([
-        'codigo' => $request->codigo,
-        'cliente_id' => $request->cliente_id,
-        'monto' => $request->monto,
-        'fecha_prestamo' => $request->fecha_prestamo,
-        'multa_por_retraso' => $request->multa_por_retraso,
-    ]);
-
-    return redirect()->route('prestamos.index')->with('success', 'Préstamo actualizado correctamente.');
-}
-
-
+        return redirect()->route('prestamos.index')->with('success', 'Préstamo actualizado correctamente.');
+    }
 
     public function generarPdf(Prestamo $prestamo)
     {
@@ -166,6 +175,7 @@ public function actualizarBasico(Request $request, Prestamo $prestamo)
 
         return $pdf->stream('boleta-' . $prestamo->codigo . '.pdf');
     }
+
     public function updateEstado(Request $request, Prestamo $prestamo)
     {
         $request->validate([

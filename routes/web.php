@@ -25,6 +25,15 @@ use App\Http\Controllers\ReporteController;
 
 // routes/web.php
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\GastoController; // <-- No olvides importar arriba
+// ... imports
+use App\Http\Controllers\CajaController;
+
+// ... dentro del middleware 'auth'
+
+// RUTA UNIFICADA PARA CAJA (Ver, Gastos y Capital)
+
+// ... dentro del middleware('auth')
 
 Route::get('/dashboard', [DashboardController::class, 'index'])
     ->middleware(['auth'])
@@ -51,7 +60,9 @@ Route::middleware('auth')->group(function () {
     Route::get   ('/profile',  [ProfileController::class, 'edit'   ])->name('profile.edit');
     Route::patch ('/profile',  [ProfileController::class, 'update' ])->name('profile.update');
     Route::delete('/profile',  [ProfileController::class, 'destroy'])->name('profile.destroy');
-
+Route::resource('gastos', GastoController::class);
+Route::get('/caja', [CajaController::class, 'index'])->name('caja.index');
+Route::post('/caja', [CajaController::class, 'store'])->name('caja.store');
 // En routes/web.php
 
 

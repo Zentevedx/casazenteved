@@ -56,7 +56,12 @@ const showingNavigationDropdown = ref(false);
 
                                 <BuscadorGlobal />
 
-                                
+                                <NavLink :href="route('gastos.index')" :active="route().current('gastos.*')">
+    💸 Gastos
+</NavLink>
+<NavLink :href="route('caja.index')" :active="route().current('caja.*')">
+    💰 Caja
+</NavLink>
                             </div>
                         </div>
 
