@@ -14,58 +14,50 @@ class ArticuloController extends Controller
     {
         $filtroEstado = $request->input('estado', 'todos');
         $search = $request->input('search');
+        $sort = $request->input('sort', 'mas_recientes'); // Default sort
 
         // Configuración de Fechas
         $fechaHoy = Carbon::now()->startOfDay();
         $limiteAlDia = $fechaHoy->copy()->subDays(30); 
         $limiteMoraCritica = $fechaHoy->copy()->subMonths(3);
 
-        // 1. Query Base con Pagos
-        $queryBase = Articulo::with(['prestamo.cliente'])
-            ->with(['prestamo' => function ($q) {
-                $q->withCount('articulos')
-                  ->with(['pagos' => function($p) {
-                      $p->orderBy('fecha_pago', 'desc'); // Último pago primero
-                  }]);
+        // 1. Query Base Eager Loading eficiente
+        $queryBase = Articulo::query()
+            ->with(['prestamo.cliente', 'prestamo.pagos' => function($q) {
+                $q->latest('fecha_pago');
             }])
             ->whereHas('prestamo', function (Builder $q) {
+                // Excluir préstamos inactivos o finalizados
                 $q->whereNotIn('estado', ['Pagado', 'Retirado', 'Cancelado', 'Adjudicado']);
             });
 
-        // 2. Buscador
+        // 2. Buscador Global en Artículos
         if ($search) {
             $queryBase->where(function($q) use ($search) {
                 $q->where('nombre_articulo', 'like', "%{$search}%")
                   ->orWhere('descripcion', 'like', "%{$search}%")
-                  ->orWhereHas('prestamo', fn($p) => $p->where('codigo', 'like', "%{$search}%"));
+                  ->orWhereHas('prestamo', function($p) use ($search) {
+                      $p->where('codigo', 'like', "%{$search}%")
+                        ->orWhereHas('cliente', fn($c) => $c->where('nombre', 'like', "%{$search}%"));
+                  });
             });
         }
 
-        // 3. Contadores
-        $todosCount = (clone $queryBase)->count();
-        $moraCriticaCount = Articulo::whereHas('prestamo', function ($q) use ($limiteMoraCritica) {
-            $q->whereNotIn('estado', ['Pagado', 'Retirado', 'Cancelado', 'Adjudicado'])
-              ->where(function ($subQ) use ($limiteMoraCritica) {
-                  $subQ->whereDoesntHave('pagos')
-                       ->whereDate('fecha_prestamo', '<', $limiteMoraCritica);
-              })
-              ->orWhere(function ($subQ) use ($limiteMoraCritica) {
-                  $subQ->whereHas('pagos')
-                       ->whereDoesntHave('pagos', fn($p) => $p->whereDate('fecha_pago', '>=', $limiteMoraCritica));
-              });
-        })->count();
+        // 3. Lógica de Filtros por Estado
+        // Clonamos para contadores antes de aplicar filtros específicos
+        $queryTodos = clone $queryBase;
 
-        // 4. Filtros
-        $query = clone $queryBase;
+        // Filtros específicos
         switch ($filtroEstado) {
             case 'aldia':
-                $query->whereHas('prestamo', fn($q) => 
+                $queryBase->whereHas('prestamo', function($q) use ($limiteAlDia) {
                     $q->where('estado', 'Pendiente')
-                      ->whereDate('fecha_prestamo', '>=', $limiteAlDia)
-                );
+                      ->whereDate('fecha_prestamo', '>=', $limiteAlDia);
+                });
                 break;
+
             case 'vencido':
-                $query->whereHas('prestamo', function($q) use ($limiteAlDia, $limiteMoraCritica) {
+                $queryBase->whereHas('prestamo', function($q) use ($limiteAlDia, $limiteMoraCritica) {
                     $q->where('estado', '!=', 'Pagado')
                       ->where(function($sub) use ($limiteAlDia, $limiteMoraCritica) {
                           $sub->whereDate('fecha_prestamo', '<', $limiteAlDia)
@@ -73,76 +65,100 @@ class ArticuloController extends Controller
                       });
                 });
                 break;
+
             case 'mora_critica':
-                $query->whereHas('prestamo', function ($q) use ($limiteMoraCritica) {
+                $queryBase->whereHas('prestamo', function ($q) use ($limiteMoraCritica) {
                     $q->where(function ($subQ) use ($limiteMoraCritica) {
-                        $subQ->whereDoesntHave('pagos')->whereDate('fecha_prestamo', '<', $limiteMoraCritica);
+                        // Caso A: Sin pagos y fecha antigua
+                        $subQ->whereDoesntHave('pagos')
+                             ->whereDate('fecha_prestamo', '<', $limiteMoraCritica);
                     })->orWhere(function ($subQ) use ($limiteMoraCritica) {
-                        $subQ->whereHas('pagos')->whereDoesntHave('pagos', fn($p) => $p->whereDate('fecha_pago', '>=', $limiteMoraCritica));
+                        // Caso B: Con pagos, pero el último es antiguo
+                        $subQ->whereHas('pagos')
+                             ->whereDoesntHave('pagos', fn($p) => $p->whereDate('fecha_pago', '>=', $limiteMoraCritica));
                     });
                 });
                 break;
         }
 
-        // 5. KPIs y Transformación
-        $articulosParaStats = (clone $query)->get();
-        $valorCapitalMostrado = $articulosParaStats->sum(function ($articulo) {
-            return ($articulo->prestamo && $articulo->prestamo->articulos_count > 0)
-                ? $articulo->prestamo->monto / $articulo->prestamo->articulos_count
-                : 0;
+        // 4. KPIs y Contadores (Usando queries optimizadas)
+        // Count de todos los activos
+        $todosCount = (clone $queryTodos)->count();
+
+        // Count de críticos (query independiente para el badge siempre visible)
+        $moraCriticaCount = Articulo::whereHas('prestamo', function ($q) use ($limiteMoraCritica) {
+            $q->whereNotIn('estado', ['Pagado', 'Retirado', 'Cancelado', 'Adjudicado'])
+              ->where(function ($subQ) use ($limiteMoraCritica) {
+                  $subQ->whereDoesntHave('pagos')->whereDate('fecha_prestamo', '<', $limiteMoraCritica);
+              })->orWhere(function ($subQ) use ($limiteMoraCritica) {
+                  $subQ->whereHas('pagos')->whereDoesntHave('pagos', fn($p) => $p->whereDate('fecha_pago', '>=', $limiteMoraCritica));
+              });
+        })->count();
+
+        // Calcular Capital Visible en la vista actual
+        // Obtenemos una colección ligera solo con los datos necesarios para sumar
+        $articulosVisibles = (clone $queryBase)->with('prestamo')->get();
+        $capitalVisible = $articulosVisibles->sum(function ($articulo) {
+             if (!$articulo->prestamo) return 0;
+             $count = $articulo->prestamo->articulos->count(); // Usar la relación cargada o count manual
+             return $count > 0 ? $articulo->prestamo->monto / $count : 0;
         });
 
-        $articulos = $query->join('prestamos', 'articulos.prestamo_id', '=', 'prestamos.id')
-            ->select('articulos.*') 
-            ->orderBy('prestamos.fecha_prestamo', 'asc')
+
+        // 5. Paginación y Transformación de Datos
+        $articulos = $queryBase->join('prestamos', 'articulos.prestamo_id', '=', 'prestamos.id')
+            ->select('articulos.*', 'prestamos.fecha_prestamo', 'prestamos.monto') // Select columns needed for ordering
+            ->when($sort, function($q) use ($sort) {
+                switch($sort) {
+                    case 'mas_recientes':
+                        return $q->orderBy('prestamos.fecha_prestamo', 'desc');
+                    case 'mas_antiguos':
+                        return $q->orderBy('prestamos.fecha_prestamo', 'asc');
+                    case 'mayor_precio':
+                        return $q->orderBy('prestamos.monto', 'desc');
+                    case 'menor_precio':
+                        return $q->orderBy('prestamos.monto', 'asc');
+                    case 'criticos':
+                        // Fallback sort: oldest loans first usually means more critical/late
+                        return $q->orderBy('prestamos.fecha_prestamo', 'asc');
+                }
+            })
             ->paginate(16)
             ->withQueryString()
             ->through(function ($articulo) {
                 $prestamo = $articulo->prestamo;
-                $cantidad = $prestamo->articulos_count > 0 ? $prestamo->articulos_count : 1;
+                $cantidadArticulos = $prestamo->articulos->count() ?: 1;
                 
-                // --- LÓGICA DE FECHAS ---
-                $fechaRef = $prestamo->fecha_prestamo;
-                $origen = 'Inicio Préstamo';
+                // Determinar fecha de referencia (Inicio o Último Pago)
+                $ultimoPago = $prestamo->pagos->first(); // Ya está ordenado por latest en la relación
+                $fechaRef = $ultimoPago ? $ultimoPago->fecha_pago : $prestamo->fecha_prestamo;
+                $origenFecha = $ultimoPago ? 'Último Pago' : 'Inicio Préstamo';
 
-                if ($prestamo->pagos && $prestamo->pagos->count() > 0) {
-                    $ultimoPago = $prestamo->pagos->first();
-                    $fechaRef = $ultimoPago->fecha_pago;
-                    $origen = 'Último Pago';
-                }
+                // Cálculo de Mora
+                $fechaRefCarbon = Carbon::parse($fechaRef)->startOfDay();
+                $diasMora = intval($fechaRefCarbon->diffInDays(Carbon::now()->startOfDay(), false));
 
-                $diasMora = intval(Carbon::parse($fechaRef)->startOfDay()->diffInDays(Carbon::now()->startOfDay(), false));
-
-                // --- FORMATEO PULIDO (DÍAS -> MESES) ---
-                if ($diasMora < 30) {
-                    $textoTiempo = "$diasMora días";
-                } else {
-                    $meses = floor($diasMora / 30);
-                    $diasSobra = $diasMora % 30;
-                    $textoMes = $meses == 1 ? "1 mes" : "$meses meses";
-                    
-                    if ($diasSobra > 0) {
-                        $textoTiempo = "$textoMes y $diasSobra días";
-                    } else {
-                        $textoTiempo = $textoMes;
-                    }
-                }
+                // Formateo human-readable del tiempo
+                $textoTiempo = $this->formatTimeText($diasMora);
 
                 return [
                     'id' => $articulo->id,
                     'nombre' => $articulo->nombre_articulo,
                     'descripcion' => $articulo->descripcion,
                     'foto_url' => $articulo->foto_url,
-                    'valor_proporcional' => $prestamo->monto / $cantidad,
+                    'valor_proporcional' => $prestamo->monto / $cantidadArticulos,
                     'dias_mora' => $diasMora,
-                    'tiempo_texto' => $textoTiempo, // <--- CAMPO NUEVO FORMATEADO
-                    'origen_calculo' => $origen,
+                    'tiempo_texto' => $textoTiempo,
+                    'origen_calculo' => $origenFecha,
                     'es_critico' => $diasMora > 90,
+                    'estado_prestamo' => $prestamo->estado,
                     'cliente' => [
                         'id' => $prestamo->cliente_id,
                         'nombre' => $prestamo->cliente->nombre . ' ' . $prestamo->cliente->apellido,
                     ],
                     'prestamo' => [
+                        'id' => $prestamo->id,
+                        'codigo' => $prestamo->codigo,
                         'monto_total' => $prestamo->monto,
                     ]
                 ];
@@ -150,15 +166,28 @@ class ArticuloController extends Controller
 
         return Inertia::render('Articulos/Index', [
             'articulos' => $articulos,
-            'filters' => ['estado' => $filtroEstado, 'search' => $search],
+            'filters' => ['estado' => $filtroEstado, 'search' => $search, 'sort' => $sort],
             'kpis' => [
-                'capital_visible' => $valorCapitalMostrado,
-                'items_visibles' => $articulosParaStats->count(),
+                'capital_visible' => $capitalVisible,
+                'items_visibles' => $articulos->total(),
             ],
             'counters' => [
                 'todos' => $todosCount,
                 'criticos' => $moraCriticaCount
             ]
         ]);
+    }
+
+    /**
+     * Helper para formatear días en meses/días texto
+     */
+    private function formatTimeText($dias) {
+        if ($dias < 30) return "$dias días";
+        
+        $meses = floor($dias / 30);
+        $sobra = $dias % 30;
+        
+        $txtMes = $meses == 1 ? "1 mes" : "$meses meses";
+        return $sobra > 0 ? "$txtMes y $sobra días" : $txtMes;
     }
 }

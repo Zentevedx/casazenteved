@@ -1,223 +1,276 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <title>Papeleta de Empeño</title>
-  <style>
-    body {
-  font-family: "Liberation Sans", sans-serif;
-      font-size: 11px;
-      margin: 10px 20px;
-    }
-    
-  
+    <meta charset="UTF-8">
+    <title>Boleta #{{ $prestamo->codigo }}</title>
+    <style>
+        @page {
+            size: letter;
+            margin: 0;
+        }
+        body {
+            font-family: 'Helvetica', 'Arial', sans-serif;
+            margin: 0;
+            padding: 20px;
+            color: #333;
+            background: #fff;
+        }
+        .container {
+            width: 100%;
+            height: 48vh; /* Mitad de carta aprox */
+            border-bottom: 2px dashed #ccc;
+            padding-bottom: 20px;
+            margin-bottom: 20px;
+            position: relative;
+        }
+        .header {
+            display: table;
+            width: 100%;
+            border-bottom: 2px solid #000;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+        }
+        .logo-section {
+            display: table-cell;
+            width: 20%;
+            vertical-align: middle;
+        }
+        .logo {
+            width: 80px;
+            height: auto;
+        }
+        .company-info {
+            display: table-cell;
+            width: 50%;
+            vertical-align: middle;
+            font-size: 10px;
+            line-height: 1.4;
+        }
+        .company-name {
+            font-size: 16px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        .ticket-info {
+            display: table-cell;
+            width: 30%;
+            text-align: right;
+            vertical-align: top;
+        }
+        .ticket-number {
+            font-size: 24px;
+            font-weight: bold;
+            color: #d32f2f;
+        }
+        .ticket-label {
+            font-size: 10px;
+            font-weight: bold;
+            text-transform: uppercase;
+            color: #555;
+        }
 
+        .section-title {
+            font-size: 11px;
+            font-weight: bold;
+            text-transform: uppercase;
+            background: #f0f0f0;
+            padding: 4px 8px;
+            margin-bottom: 5px;
+            border-left: 4px solid #333;
+        }
 
-    .logo {
-      width: 65px;
-      height: auto;
-      margin: 0px;
-      
-    }
+        .grid {
+            display: table;
+            width: 100%;
+            margin-bottom: 10px;
+        }
+        .col {
+            display: table-cell;
+            padding-right: 10px;
+        }
+        .field {
+            margin-bottom: 4px;
+        }
+        .label {
+            font-size: 9px;
+            color: #666;
+            text-transform: uppercase;
+        }
+        .value {
+            font-size: 11px;
+            font-weight: bold;
+        }
 
-    .row {
-      width: 100%;
-      display: block;
-      clear: both;
-      margin-bottom: 10px;
-    }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 10px;
+            font-size: 10px;
+        }
+        th {
+            background: #f0f0f0;
+            text-align: left;
+            padding: 4px 8px;
+            border-bottom: 1px solid #ddd;
+        }
+        td {
+            padding: 4px 8px;
+            border-bottom: 1px solid #eee;
+        }
 
-    .col-6 {
-      width: 70%;
-      float: left;
-      box-sizing: border-box;
-    }
+        .terms {
+            font-size: 8px;
+            text-align: justify;
+            color: #555;
+            margin-top: 10px;
+            line-height: 1.2;
+            border: 1px solid #eee;
+            padding: 8px;
+        }
 
-    .col-3 {
-      width: 48%;
-      float: left;
-      box-sizing: border-box;
-    }
-    .col-2 {
-      width: 20%;
-      float: right;
-      text-align: right;
-    }
+        .signatures {
+            margin-top: 30px;
+            display: table;
+            width: 100%;
+        }
+        .sig-box {
+            display: table-cell;
+            width: 45%;
+            text-align: center;
+        }
+        .sig-line {
+            border-top: 1px solid #000;
+            width: 80%;
+            margin: 0 auto;
+            padding-top: 4px;
+            font-size: 10px;
+            font-weight: bold;
+        }
 
-    .empresa-info {
-      font-size: 10px;
-      line-height: 1.3;
-      margin-left: 15px;
-    }
-    .empresa-header {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
+        .totals {
+            text-align: right;
+            font-size: 12px;
+            margin-top: 10px;
+        }
+        .total-row {
+            margin-bottom: 2px;
+        }
+        .total-big {
+            font-size: 14px;
+            font-weight: bold;
+            color: #000;
+        }
 
-    
-
-    .codigo-label {
-      font-size: 10px;
-    }
-
-    .codigo {
-      font-size: 25px;
-      color: #0b4f64ff;
-      font-weight: bold;
-    }
-
-    .rounded-card {
-      border-radius: 10px;
-      background-color: #ffffffff;
-      padding: 5px;
-      border: 1px solid #0b4f64ff;
-      margin-bottom: 5px;
-      clear: both;
-    }
-
-    .rounded-table {
-      border: 1px solid #1f1f1f;
-      width: 100%;
-      border-collapse: collapse;
-      overflow: hidden;
-    }
-
-    .rounded-table th, .rounded-table td {
-      border: 1px solid #1f1f1fff;
-      padding: 3px;
-      font-size: 10px;
-    }
-
-    .rounded-table th {
-      background-color: #ffffffff;
-    }
-
-    .nota {
-      font-size: 9px;
-      font-style: italic;
-    }
-
-    .firma-linea {
-      border-top: 1px solid #000;
-      width: 200px;
-      text-align: center;
-      margin-top: 35px;
-      padding-top: 4px;
-    }
-
-    .text-center {
-      text-align: center;
-    }
-
-    .font-bold {
-      font-weight: bold;
-    }
-.col-3 {
-  width: 15%;
-  float: left;
-  box-sizing: border-box;
-}
-
-.col-6 {
-  width: 65%;
-  float: left;
-  box-sizing: border-box;
-}
-
-.text-right {
-  text-align: right;
-}
-
-.clearfix::after {
-  content: "";
-  display: table;
-  clear: both;
-}
-
-    .clearfix::after {
-      content: "";
-      display: table;
-      clear: both;
-    }
-  </style>
+        .watermark {
+            position: absolute;
+            top: 30%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(-45deg);
+            font-size: 80px;
+            color: rgba(0,0,0,0.03);
+            font-weight: bold;
+            z-index: -1;
+            pointer-events: none;
+        }
+    </style>
 </head>
 <body>
 
- <!-- Encabezado con tres columnas -->
-<div class="row clearfix">
-  <div class="col-3">
-    <img src="{{ public_path('logo2.jpg') }}" class="logo">
-  </div>
-  <div class="col-6 empresa-info">
-    <strong>CASA DE EMPEÑOS</strong><br>
-    Av. Panamericana / Av. V. de Loreto<br>
-    Whatsapp: 60763882<br>
-    NIT: 8420256011
-  </div>
-  <div class="col-3 text-right">
-    <div class="codigo-label">C Ó D I G O</div>
-    <div class="codigo">{{ $prestamo->codigo }}</div>
-  </div>
-</div>
+@for ($copy = 1; $copy <= 2; $copy++)
+    <div class="container">
+        <div class="watermark">ORIGINAL</div>
+        
+        <div class="header">
+            <div class="logo-section">
+                <!-- Ajusta la ruta del logo si es necesario o úsala base64 -->
+                @if(file_exists(public_path('logo2.jpg')))
+                    <img src="{{ public_path('logo2.jpg') }}" class="logo">
+                @else
+                    <div style="font-size:20px; font-weight:bold;">PRESTAMAX</div>
+                @endif
+            </div>
+            <div class="company-info">
+                <div class="company-name">Casa de Empeños</div>
+                <div>Av. Panamericana / Av. V. de Loreto</div>
+                <div>Cochabamba - Bolivia</div>
+                <div><strong>Whatsapp:</strong> 60763882 | <strong>NIT:</strong> 8420256011</div>
+            </div>
+            <div class="ticket-info">
+                <div class="ticket-label">CONTRATO DE PRÉSTAMO</div>
+                <div class="ticket-number">{{ $prestamo->codigo }}</div>
+                <div style="font-size: 9px; color: #666; margin-top: 4px;">COPIA {{ $copy == 1 ? 'CLIENTE' : 'ARCHIVO' }}</div>
+            </div>
+        </div>
 
+        <div class="grid">
+            <div class="col" style="width: 60%;">
+                <div class="section-title">DATOS DEL CLIENTE</div>
+                <div class="grid">
+                    <div class="col">
+                        <div class="field"><span class="label">NOMBRE:</span> <span class="value">{{ $prestamo->cliente->nombre }}</span></div>
+                        <div class="field"><span class="label">CI/NIT:</span> <span class="value">{{ $prestamo->cliente->ci }}</span></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col" style="width: 40%;">
+                <div class="section-title">DETALLES DEL PRÉSTAMO</div>
+                <div class="grid">
+                    <div class="col">
+                        <div class="field"><span class="label">FECHA INICIO:</span> <span class="value">{{ \Carbon\Carbon::parse($prestamo->fecha_prestamo)->format('d/m/Y') }}</span></div>
+                        <div class="field"><span class="label">VENCIMIENTO:</span> <span class="value" style="color: #d32f2f;">{{ \Carbon\Carbon::parse($prestamo->fecha_prestamo)->addDays(30)->format('d/m/Y') }}</span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
 
-  <!-- Título -->
-  <h4 class="text-center font-bold">PAPELETA DE EMPEÑO</h4>
+        <div class="section-title">ARTÍCULOS EN GARANTÍA PRENDARIA</div>
+        <table>
+            <thead>
+                <tr>
+                    <th width="40">#</th>
+                    <th>ARTÍCULO</th>
+                    <th>DESCRIPCIÓN / OBSERVACIONES</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach ($prestamo->articulos as $index => $item)
+                <tr>
+                    <td>{{ $index + 1 }}</td>
+                    <td><b>{{ $item->nombre_articulo }}</b></td>
+                    <td>{{ $item->descripcion }}</td>
+                </tr>
+                @endforeach
+            </tbody>
+        </table>
 
-  <!-- Datos del cliente -->
-  <div class="rounded-card">
-    <div class="row">
-      <div class="col-6"><strong>Titular:</strong> {{ $prestamo->cliente->nombre }}</div>
-      <div class="col-6"><strong>CI:</strong> {{ $prestamo->cliente->ci }}</div>
+        <div class="totals">
+            <div class="total-row"><span class="label">CAPITAL PRESTADO:</span> <span class="total-big">Bs {{ number_format($prestamo->monto, 2) }}</span></div>
+        </div>
+
+        <div class="terms">
+            <strong>TÉRMINOS Y CONDICIONES:</strong>
+            1. El deudor declara haber recibido el monto detallado a su entera satisfacción.
+            2. El plazo del contrato es de 30 días calendario. Vencido el plazo, se generará una mora automática.
+            3. La falta de pago o renovación por más de 90 días facultará a la Casa de Empeños a disponer del bien prendado para recuperar el capital, sin necesidad de notificación judicial.
+            4. El deudor garantiza ser el legítimo propietario de los bienes dejados en garantía.
+        </div>
+
+        <div class="signatures">
+            <div class="sig-box">
+                <div class="sig-line">FIRMA DEL CLIENTE</div>
+                <div style="font-size: 8px; margin-top: 2px;">{{ $prestamo->cliente->nombre }}</div>
+            </div>
+            <div class="sig-box">
+                <!-- Espacio para sello opcional -->
+                <div class="sig-line">FIRMA AUTORIZADA</div>
+                <div style="font-size: 8px; margin-top: 2px;">CASA DE EMPEÑOS</div>
+            </div>
+        </div>
     </div>
-    <div class="row">
-      <div class="col-6"><strong>Fecha de préstamo:</strong> {{ \Carbon\Carbon::parse($prestamo->fecha_prestamo)->format('d/m/Y') }}</div>
-      <div class="col-6"><strong>Vencimiento:</strong> {{ \Carbon\Carbon::parse($prestamo->fecha_prestamo)->addDays(30)->format('d/m/Y') }}</div>
-    </div>
-    <div class="row">
-      <div class="col-6"><strong>Monto prestado:</strong> Bs {{ number_format($prestamo->monto, 2, ',', '.') }}</div>
-      <div class="col-6"><strong>Multa por retraso:</strong> Bs {{ number_format($prestamo->multa_por_retraso ?? 0, 2, ',', '.') }}</div>
-    </div>
-  </div>
 
-  <!-- Tabla de artículos -->
-  <h5 class="mb-3">Artículos prendados</h5>
-  <table class="rounded-table">
-    <thead>
-      <tr>
-        <th style="width: 50px;">Nro</th>
-        <th style="width: 200px;">Artículo</th>
-        <th>Descripción</th>
-      </tr>
-    </thead>
-    <tbody>
-      @foreach ($prestamo->articulos as $i => $articulo)
-        <tr>
-          <td>{{ $i + 1 }}</td>
-          <td>{{ $articulo->nombre_articulo }}</td>
-          <td>{{ $articulo->
-          descripcion }}</td>
-        </tr>
-      @endforeach
-    </tbody>
-  </table>
-
-  <!-- Nota -->
-  <p class="nota">
-    El interés incluye los costos por almacenamiento y seguridad del artículo empeñado.
-    En caso de retraso, se aplicará una multa diaria a partir del día siguiente al vencimiento establecido.
-  </p>
-
-  <!-- Firmas -->
-  <div class="row clearfix" style="margin-top: 50px;">
-    <div class="col-6 text-center">
-      <div class="firma-linea">Firma del Cliente</div>
-    </div>
-    <div class="col-6 text-center">
-      <div class="firma-linea">Firma del Encargado</div>
-    </div>
-  </div>
+    <!-- Salto de línea visual entre copias solo para separar en vista, el CSS print maneja márgenes -->
+    @if($copy == 1) <div style="border-top: 1px dotted #ccc; margin: 20px 0;"></div> @endif
+@endfor
 
 </body>
 </html>

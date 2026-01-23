@@ -48,7 +48,26 @@ class DashboardController extends Controller
         $query = Prestamo::with(['cliente', 'pagos', 'articulos']);
 
         if ($estadoFiltro !== 'Todos') {
-            $query->where('estado', $estadoFiltro);
+            if ($estadoFiltro === 'mora_critica') {
+                $query->where('estado', '!=', 'Pagado')
+                      ->where(function($q) {
+                          $q->where('estado', 'Vencido')
+                            ->orWhereDate('fecha_prestamo', '<', Carbon::now()->subDays(90));
+                      });
+            } elseif ($estadoFiltro === 'por_vencer') {
+                $query->where('estado', 'Activo')
+                      ->where(function($masterQ) {
+                          $masterQ->whereHas('pagos', function($q) {
+                               $q->select('prestamo_id')->groupBy('prestamo_id')
+                                 ->havingRaw('MAX(fecha_pago) < ?', [Carbon::now()->subDays(25)]);
+                          })->orWhereDoesntHave('pagos', function($q) {
+                               $q->whereDate('fecha_prestamo', '<', Carbon::now()->subDays(25));
+                          });
+                      });
+            } else {
+                // Filtro normal (Activo, Pagado, Vencido)
+                $query->where('estado', $estadoFiltro);
+            }
         }
 
         $prestamos = $query->get();
@@ -110,12 +129,13 @@ class DashboardController extends Controller
                 'monto' => $prestamo->monto,
                 'estado' => $prestamo->estado, 
                 'cliente_nombre' => $prestamo->cliente->nombre ?? 'Desconocido',
-                'cliente_id' => $prestamo->cliente->id ?? null, // <--- CAMBIO CLAVE AQUI
+                'cliente_id' => $prestamo->cliente->id ?? null,
                 'fecha_prestamo' => $fechaBase->toDateString(), 
                 'fecha_proximo_pago' => $fechaProximoPago->toDateString(),
                 'capital_recuperado' => $capitalRecuperado,
                 'intereses_generados' => $interesesGenerados,
                 'esta_en_mora' => $estaEnMora,
+                'meses_atraso' => $fechaReferenciaProximo->floatDiffInMonths(Carbon::now(), false), // Calculate lag from theoretical paid-up date
                 'historial_intereses' => $historialIntereses,
                 'articulos' => $listaArticulos,
             ];
@@ -153,9 +173,72 @@ class DashboardController extends Controller
                         'monto_total' => $prestamosDelMes->sum('monto'),
                         'capital_recuperado' => $prestamosDelMes->sum('capital_recuperado'),
                         'intereses_generados' => $prestamosDelMes->sum('intereses_generados'),
+                    ],
+                    'contadores' => [
+                        'total'    => $prestamosDelMes->count(),
+                        'verde'    => $prestamosDelMes->filter(fn($p) => $p['estado'] !== 'Pagado' && $p['meses_atraso'] < 1)->count(),
+                        'amarillo' => $prestamosDelMes->filter(fn($p) => $p['estado'] !== 'Pagado' && $p['meses_atraso'] >= 1 && $p['meses_atraso'] < 3)->count(),
+                        'rojo'     => $prestamosDelMes->filter(fn($p) => $p['estado'] !== 'Pagado' && $p['meses_atraso'] >= 3)->count(),
+                        'pagado'   => $prestamosDelMes->filter(fn($p) => $p['estado'] === 'Pagado')->count(),
                     ]
                 ];
             })->sortByDesc('mes_anio')->values();
+
+        // 5. ALERTA DE NEGOCIO (NUEVO)
+        $alertas = [
+            'criticos' => Prestamo::where('estado', '!=', 'Pagado')
+                ->where(function($q) {
+                    $q->where('estado', 'Vencido')
+                      ->orWhereDate('fecha_prestamo', '<', Carbon::now()->subDays(90));
+                })->count(),
+            
+            'por_vencer' => Prestamo::where('estado', 'Activo')
+                ->whereHas('pagos', function($q) {
+                     // Lógica simplificada: si no pagó en el último mes
+                     $q->select('prestamo_id')->groupBy('prestamo_id')
+                       ->havingRaw('MAX(fecha_pago) < ?', [Carbon::now()->subDays(25)]);
+                })->orWhereDoesntHave('pagos', function($q) {
+                     // O si es nuevo y ya casi cumple el mes
+                     $q->whereDate('fecha_prestamo', '<', Carbon::now()->subDays(25));
+                })->count()
+        ];
+
+        // 6. TOP DEUDORES (Real Deuda Pendiente)
+        // Obtenemos todos los préstamos NO pagados
+        $prestamosActivos = Prestamo::where('estado', '!=', 'Pagado')
+            ->with(['pagos', 'cliente'])
+            ->get();
+
+        $deudores = [];
+
+        foreach ($prestamosActivos as $p) {
+            $capitalPagado = $p->pagos->where('tipo_pago', 'Capital')->sum('monto_pagado');
+            $saldoPendiente = $p->monto - $capitalPagado;
+
+            if ($saldoPendiente <= 0) continue; // Si ya no debe capital, no cuenta
+
+            $clienteId = $p->cliente_id;
+            
+            if (!isset($deudores[$clienteId])) {
+                $deudores[$clienteId] = [
+                    'id' => $clienteId,
+                    'nombre' => $p->cliente->nombre . ' ' . $p->cliente->apellido,
+                    'foto_url' => $p->cliente->foto_url ?? null,
+                    'total_deuda' => 0,
+                    'cantidad' => 0
+                ];
+            }
+
+            $deudores[$clienteId]['total_deuda'] += $saldoPendiente;
+            $deudores[$clienteId]['cantidad']++;
+        }
+
+        // Ordenar por deuda descendente y tomar top 5
+        $topDeudores = collect($deudores)
+            ->sortByDesc('total_deuda')
+            ->take(5)
+            ->values()
+            ->all();
 
         // 4. RESPUESTA A INERTIA
         return Inertia::render('Dashboard', [
@@ -167,6 +250,8 @@ class DashboardController extends Controller
                 'total_intereses_generados' => $totalInteresesGenerados,
                 'total_prestamos_en_mora' => $prestamosEnMora,
             ],
+            'alertas' => $alertas,
+            'topDeudores' => $topDeudores
         ]);
     }
 }

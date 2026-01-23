@@ -101,6 +101,28 @@ class EstadisticasController extends Controller
             'operaciones' => Prestamo::whereBetween('fecha_prestamo', [$from, $to])->count()
         ];
 
+        // --- NUEVAS MÉTRICAS: Salud de Cartera e Inventario ---
+        // --- NUEVAS MÉTRICAS (Vintage Analysis): Salud de Cartera e Inventario en este periodo ---
+        // Filtramos por fecha de CREACIÓN del préstamo para ver la calidad de la colocación en este periodo
+        $distribucionCartera = Prestamo::whereBetween('fecha_prestamo', [$from, $to])
+            ->select('estado', DB::raw('count(*) as count'), DB::raw('sum(monto) as total_monto'))
+            ->groupBy('estado')
+            ->get();
+            
+        // El inventario es un snapshot, pero podemos ver qué pasó con los artículos de los préstamos DE ESTE PERIODO
+        $estadoInventario = Articulo::whereHas('prestamo', function($q) use ($from, $to) {
+                $q->whereBetween('fecha_prestamo', [$from, $to]);
+            })
+            ->select('estado', DB::raw('count(*) as count'))
+            ->groupBy('estado')
+            ->get();
+
+        // --- KPI: Ticket Promedio (¿Estamos prestando muy poco?) ---
+        $ticketPromedio = Prestamo::whereBetween('fecha_prestamo', [$from, $to])->avg('monto') ?? 0;
+
+        // Estructura de KPIs Globales
+        $kpis['ticket_promedio'] = $ticketPromedio; // Agregamos al array existente
+
         // --- GRÁFICOS (Tendencias) ---
         $fechas = collect();
         $flujoNeto = collect();
@@ -123,6 +145,8 @@ class EstadisticasController extends Controller
             'graficos' => [
                 'fechas' => $fechas,
                 'flujo_neto' => $flujoNeto,
+                'distribucion_cartera' => $distribucionCartera,
+                'estado_inventario' => $estadoInventario,
             ],
             'reporteCaja' => $this->generarReporteDetallado($from, $to), // (Tu función original)
             'filtros' => [

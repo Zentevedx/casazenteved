@@ -1,30 +1,32 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import { Head, Link, router } from '@inertiajs/vue3';
-import { ref } from 'vue';
+import { Head, router, Link } from '@inertiajs/vue3';
+import { ref, computed } from 'vue';
+import KpiCard from '@/Components/Estadisticas/KpiCard.vue';
+import MonthGroup from '@/Components/Dashboard/MonthGroup.vue';
+import ChartComponent from '@/Components/Dashboard/ChartComponent.vue';
+import { FunnelIcon, PlusIcon, UserPlusIcon, ExclamationTriangleIcon, ClockIcon } from '@heroicons/vue/24/solid';
 
 const props = defineProps({
     reporteAgrupado: Array,
     indicadores: Object,
     estadoFiltro: String,
+    alertas: Object,
+    topDeudores: Array
 });
 
 const estadoSeleccionado = ref(props.estadoFiltro);
-// Control de meses desplegados
-const mesesDesplegados = ref({}); 
-// Control de préstamos desplegados individualmente
-const prestamosDesplegados = ref({});
 
-const toggleMes = (mesAnio) => {
-    mesesDesplegados.value[mesAnio] = !mesesDesplegados.value[mesAnio];
-};
+const filtros = [
+    { id: 'Todos', label: 'Global' },
+    { id: 'Activo', label: 'Activos' },
+    { id: 'Vencido', label: 'Mora' },
+    { id: 'Pagado', label: 'Pagados' },
+];
 
-const togglePrestamo = (id) => {
-    prestamosDesplegados.value[id] = !prestamosDesplegados.value[id];
-};
-
-const aplicarFiltro = () => {
-    router.get(route('dashboard'), { estado: estadoSeleccionado.value }, { 
+const aplicarFiltro = (nuevoEstado) => {
+    estadoSeleccionado.value = nuevoEstado;
+    router.get(route('dashboard'), { estado: nuevoEstado }, { 
         preserveState: true, 
         preserveScroll: true 
     });
@@ -32,218 +34,163 @@ const aplicarFiltro = () => {
 
 const formatCurrency = (value) => new Intl.NumberFormat('es-BO', { style: 'currency', currency: 'BOB' }).format(value);
 
-const getAvatar = (name) => name ? name.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase() : '??';
-
-// Generador de color consistente basado en el nombre (Material Colors)
-const getAvatarColor = (name) => {
-    if (!name) return 'bg-gray-700 text-gray-300';
-    const colors = [
-        'bg-red-200 text-red-900', 'bg-pink-200 text-pink-900', 'bg-purple-200 text-purple-900',
-        'bg-indigo-200 text-indigo-900', 'bg-blue-200 text-blue-900', 'bg-cyan-200 text-cyan-900',
-        'bg-teal-200 text-teal-900', 'bg-emerald-200 text-emerald-900', 'bg-lime-200 text-lime-900',
-        'bg-orange-200 text-orange-900', 'bg-amber-200 text-amber-900'
-    ];
-    let hash = 0;
-    for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
-    return colors[Math.abs(hash) % colors.length];
-};
-
-const getStatusBadge = (estado, enMora) => {
-    if (estado === 'Pagado') return { class: 'bg-emerald-100 text-emerald-800 border-emerald-200', label: 'PAGADO' };
-    if (estado === 'Vencido' || enMora) return { class: 'bg-red-100 text-red-800 border-red-200', label: 'VENCIDO' };
-    return { class: 'bg-indigo-100 text-indigo-800 border-indigo-200', label: 'ACTIVO' }; 
-};
+const chartData = computed(() => {
+    const reversedReport = [...props.reporteAgrupado].reverse();
+    return {
+        labels: reversedReport.map(m => m.nombre_mes),
+        datasets: [
+            {
+                label: 'Préstamos',
+                data: reversedReport.map(m => m.resumen.monto_total),
+                borderColor: '#818cf8', // indigo-400
+                backgroundColor: 'rgba(129, 140, 248, 0.4)',
+                tension: 0.4
+            },
+            {
+                label: 'Recuperado',
+                data: reversedReport.map(m => m.resumen.capital_recuperado + m.resumen.intereses_generados),
+                borderColor: '#34d399', // emerald-400
+                backgroundColor: 'rgba(52, 211, 153, 0.4)',
+                tension: 0.4
+            }
+        ]
+    };
+});
 </script>
 
 <template>
-    <Head title="Panel Financiero MD3" />
+    <Head title="Panel Financiero" />
 
     <AuthenticatedLayout>
-        <div class="bg-[#121212] text-[#E0E0E0] min-h-screen p-4 md:p-8 space-y-8 font-sans">
+        <div class="min-h-screen pb-20 font-sans selection:bg-indigo-500 selection:text-white">
             
-            <div class="flex flex-col md:flex-row justify-between items-end gap-4 pb-4">
-                <div>
-                    <h1 class="text-4xl font-normal text-white tracking-tight">Dashboard</h1>
-                    <p class="text-gray-400 mt-1 text-sm">Resumen financiero y control de cartera</p>
-                </div>
-                
-                <div class="relative bg-[#2C2C2C] rounded-t-lg rounded-b-none border-b border-gray-500 hover:bg-[#363636] transition-colors min-w-[200px]">
-                    <label class="absolute top-2 left-3 text-[10px] text-gray-400 uppercase tracking-wider">Estado</label>
-                    <select v-model="estadoSeleccionado" @change="aplicarFiltro" 
-                        class="w-full bg-transparent border-none text-white pt-6 pb-2 px-3 focus:ring-0 cursor-pointer text-sm font-medium">
-                        <option value="Activo">Solo Activos</option>
-                        <option value="Vencido">En Mora / Vencidos</option>
-                        <option value="Pagado">Histórico Pagados</option>
-                        <option value="Todos">Vista Global</option>
-                    </select>
-                </div>
-            </div>
-
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div class="bg-[#1E1E1E] p-6 rounded-[24px] shadow-lg hover:shadow-xl transition-shadow border border-gray-800 relative overflow-hidden group">
-                    <div class="absolute right-0 top-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                    </div>
-                    <p class="text-gray-400 text-sm font-medium">Total Colocado</p>
-                    <p class="text-3xl font-normal text-white mt-2">{{ formatCurrency(indicadores.total_prestado) }}</p>
-                </div>
-
-                <div class="bg-[#1E1E1E] p-6 rounded-[24px] shadow-lg border border-gray-800 relative overflow-hidden">
-                    <div class="absolute right-0 top-0 p-4 opacity-10"><div class="w-16 h-16 bg-emerald-500 rounded-full blur-2xl"></div></div>
-                    <p class="text-emerald-200 text-sm font-medium">Capital Recuperado</p>
-                    <p class="text-3xl font-normal text-emerald-400 mt-2">{{ formatCurrency(indicadores.total_capital_recuperado) }}</p>
-                </div>
-
-                <div class="bg-[#1E1E1E] p-6 rounded-[24px] shadow-lg border border-gray-800 relative overflow-hidden">
-                     <div class="absolute right-0 top-0 p-4 opacity-10"><div class="w-16 h-16 bg-amber-500 rounded-full blur-2xl"></div></div>
-                    <p class="text-amber-200 text-sm font-medium">Ganancia (Interés)</p>
-                    <p class="text-3xl font-normal text-amber-400 mt-2">{{ formatCurrency(indicadores.total_intereses_generados) }}</p>
-                </div>
-
-                <div class="bg-[#2B1818] p-6 rounded-[24px] shadow-lg border border-red-900/30">
-                    <p class="text-red-200 text-sm font-medium">Riesgo / Mora</p>
-                    <div class="flex items-baseline gap-2 mt-2">
-                        <p class="text-3xl font-normal text-red-400">{{ indicadores.total_prestamos_en_mora }}</p>
-                        <span class="text-xs text-red-300/60">préstamos</span>
-                    </div>
-                </div>
-            </div>
-
-            <div v-if="reporteAgrupado.length === 0" class="flex flex-col items-center justify-center py-20 bg-[#1E1E1E] rounded-[32px] border border-dashed border-gray-700">
-                <p class="text-gray-500 text-lg">No se encontraron registros para este filtro.</p>
-            </div>
-
-            <div v-else class="space-y-6">
-                <div v-for="mes in reporteAgrupado" :key="mes.mes_anio" class="bg-[#1E1E1E] rounded-[28px] overflow-hidden shadow-sm transition-all duration-300">
-                    
-                    <div @click="toggleMes(mes.mes_anio)" 
-                         class="cursor-pointer px-4 sm:px-6 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between hover:bg-white/5 transition-colors border-b border-gray-800/50 gap-4">
+            <!-- Sticky Modern Header -->
+            <div class="sticky top-0 z-40 bg-white/80 dark:bg-dark-bg/95 backdrop-blur-xl border-b border-gray-200 dark:border-gray-800 shadow-sm dark:shadow-xl transition-all duration-300">
+                <div class="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-4">
+                    <div class="flex flex-col md:flex-row justify-between items-center gap-4">
                         
-                        <div class="flex items-center gap-4">
-                            <div class="bg-[#333] p-2 rounded-xl flex-shrink-0">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-400 transition-transform duration-300" 
-                                     :class="{ 'rotate-180': mesesDesplegados[mes.mes_anio] }" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                        <!-- Title Zone -->
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-blue-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
                                 </svg>
                             </div>
-                            <h2 class="text-xl text-white font-medium capitalize">{{ mes.nombre_mes }}</h2>
+                            <div>
+                                <h1 class="text-xl font-bold text-gray-900 dark:text-white tracking-tight">Dashboard General</h1>
+                                <p class="text-xs text-gray-500 font-medium">Control Operativo</p>
+                            </div>
                         </div>
 
-                        <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto sm:justify-end pl-14 sm:pl-0">
-                            <div class="flex flex-col items-end px-3 py-1 bg-gray-800 rounded-xl border border-gray-700">
-                                <span class="text-[10px] text-gray-500 uppercase tracking-wider">Prestado</span>
-                                <span class="font-mono font-bold text-gray-300 text-xs sm:text-sm">{{ formatCurrency(mes.resumen.monto_total) }}</span>
-                            </div>
+                        <!-- Modern Tabs Filter -->
+                        <div class="flex bg-gray-100 dark:bg-black/40 p-1 rounded-xl overflow-x-auto max-w-full">
+                            <button 
+                                v-for="filtro in filtros" 
+                                :key="filtro.id"
+                                @click="aplicarFiltro(filtro.id)"
+                                :class="['px-5 py-2 rounded-lg text-xs font-bold transition-all duration-300 flex-shrink-0', 
+                                    estadoSeleccionado === filtro.id 
+                                    ? 'bg-white dark:bg-indigo-600 text-indigo-600 dark:text-white shadow-sm dark:shadow-md' 
+                                    : 'text-gray-500 hover:text-gray-900 dark:hover:text-gray-300 hover:bg-white/50 dark:hover:bg-white/5']"
+                            >
+                                {{ filtro.label }}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
-                            <div class="flex flex-col items-end px-3 py-1 bg-emerald-900/20 rounded-xl border border-emerald-500/20">
-                                <span class="text-[10px] text-emerald-400/70 uppercase tracking-wider">Recuperado</span>
-                                <span class="font-mono font-bold text-emerald-400 text-xs sm:text-sm">{{ formatCurrency(mes.resumen.capital_recuperado) }}</span>
-                            </div>
+            <div class="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
 
-                            <div class="flex flex-col items-end px-3 py-1 bg-amber-900/20 rounded-xl border border-amber-500/20">
-                                <span class="text-[10px] text-amber-400/70 uppercase tracking-wider">Ganancia</span>
-                                <span class="font-mono font-bold text-amber-400 text-xs sm:text-sm">{{ formatCurrency(mes.resumen.intereses_generados) }}</span>
+
+
+                 <!-- KPI Grid -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+                    <KpiCard title="Total Colocado" :value="formatCurrency(indicadores.total_prestado)" colorTheme="indigo" />
+                    <KpiCard title="Recuperado" :value="formatCurrency(indicadores.total_capital_recuperado)" colorTheme="emerald" />
+                    <KpiCard title="Ganancia Interés" :value="formatCurrency(indicadores.total_intereses_generados)" colorTheme="amber" />
+                    <KpiCard title="Riesgo / Mora" :value="indicadores.total_prestamos_en_mora" subValue="préstamos retrasados" colorTheme="red" />
+                </div>
+
+                <!-- Main Content -->
+                <div class="grid grid-cols-1 xl:grid-cols-3 gap-8">
+                    
+                    <!-- LEFT COLUMN: LOAN LIST (Takes 2/3 width) -->
+                    <div class="xl:col-span-2 space-y-6">
+                        <div class="flex justify-between items-center">
+                            <h3 class="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                                Cronograma de Actividad
+                                <span class="bg-gray-200 dark:bg-gray-800 text-gray-600 dark:text-gray-400 text-[10px] px-2 py-0.5 rounded-full border border-gray-300 dark:border-gray-700">{{ reporteAgrupado.length }} periodos</span>
+                            </h3>
+                        </div>
+                        
+                        <div v-if="reporteAgrupado.length === 0" class="flex flex-col items-center justify-center py-24 bg-white dark:bg-[#1a1a1a] rounded-[24px] border border-dashed border-gray-300 dark:border-gray-800 group">
+                            <div class="w-16 h-16 rounded-full bg-gray-100 dark:bg-gray-800/50 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                                <FunnelIcon class="w-8 h-8 text-gray-400 dark:text-gray-600" />
                             </div>
+                            <p class="text-gray-500 font-medium">No se encontraron registros</p>
+                            <p class="text-xs text-gray-400 dark:text-gray-600 mt-1">Prueba cambiando el filtro de estado</p>
+                        </div>
+
+                        <div v-else class="space-y-6">
+                            <MonthGroup 
+                                v-for="(mes, index) in reporteAgrupado" 
+                                :key="mes.mes_anio" 
+                                :mes="mes"
+                                :is-initially-expanded="index === 0" 
+                            />
                         </div>
                     </div>
 
-                    <div v-show="mesesDesplegados[mes.mes_anio]" class="bg-[#181818] border-t border-gray-800">
-                        <div v-for="semana in mes.semanas" :key="semana.semana" class="p-2 sm:p-4">
-                            
-                            <div class="flex items-center gap-4 mb-4 ml-2">
-                                <div class="h-[1px] bg-gray-800 flex-grow"></div>
-                                <span class="text-xs font-bold text-gray-500 uppercase tracking-widest bg-[#181818] px-2">
-                                    Semana {{ semana.semana }} ({{ semana.rango_fechas }})
-                                </span>
-                                <div class="h-[1px] bg-gray-800 flex-grow"></div>
+                    <!-- RIGHT COLUMN: ANALYTICS & ACTIONS -->
+                    <div class="space-y-6">
+                        
+                        <!-- Quick Actions -->
+                        <div class="grid grid-cols-2 gap-4">
+                            <Link :href="route('prestamos.create')" class="group relative overflow-hidden bg-indigo-600 hover:bg-indigo-700 p-4 rounded-2xl transition-all shadow-lg hover:shadow-indigo-500/25 flex flex-col items-center justify-center gap-2 text-center h-28 border border-white/10">
+                                <PlusIcon class="w-8 h-8 text-white/90 group-hover:scale-110 transition-transform" />
+                                <span class="text-sm font-bold text-white">Nuevo Préstamo</span>
+                            </Link>
+                             <Link :href="route('clientes.create')" class="group relative overflow-hidden bg-white dark:bg-[#1a1a1a] hover:bg-gray-50 dark:hover:bg-gray-800 border border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700 p-4 rounded-2xl transition-all flex flex-col items-center justify-center gap-2 text-center h-28">
+                                <UserPlusIcon class="w-8 h-8 text-gray-400 group-hover:text-indigo-600 dark:group-hover:text-white group-hover:scale-110 transition-transform" />
+                                <span class="text-sm font-bold text-gray-500 dark:text-gray-400 group-hover:text-indigo-600 dark:group-hover:text-white">Nuevo Cliente</span>
+                            </Link>
+                        </div>
+
+                      <!-- Chart Widget -->
+                        <div class="bg-white dark:bg-[#1a1a1a] p-6 rounded-[24px] shadow-sm dark:shadow-lg border border-gray-200 dark:border-gray-800 min-h-[350px] flex flex-col">
+                            <h4 class="text-xs font-bold text-gray-500 mb-6 uppercase tracking-widest flex items-center gap-2">
+                                <span class="w-2 h-2 rounded-full bg-indigo-500"></span>
+                                Flujo de Caja (6 meses)
+                            </h4>
+                            <div class="flex-grow">
+                                <ChartComponent :data="chartData" type="line" />
                             </div>
+                        </div>
 
-                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-                                <div v-for="prestamo in semana.prestamos" :key="prestamo.id" 
-                                     class="bg-[#252525] rounded-[20px] overflow-hidden border border-gray-800 hover:border-gray-600 transition-colors">
-                                    
-                                    <div class="p-4 cursor-pointer" @click="togglePrestamo(prestamo.id)">
-                                        <div class="flex justify-between items-start gap-3">
-                                            <Link 
-                                                v-if="prestamo.cliente_id" 
-                                                :href="route('clientes.detalle', prestamo.cliente_id)" 
-                                                class="flex-shrink-0 relative group"
-                                                @click.stop> 
-                                                <div class="w-12 h-12 rounded-full flex items-center justify-center font-bold text-sm shadow-sm transition-transform group-hover:scale-110"
-                                                     :class="getAvatarColor(prestamo.cliente_nombre)">
-                                                    {{ getAvatar(prestamo.cliente_nombre) }}
-                                                </div>
-                                                <div class="absolute inset-0 rounded-full border border-white/10 group-hover:border-white/30"></div>
-                                            </Link>
-                                            
-                                            <div class="flex-grow min-w-0">
-                                                <div class="flex justify-between items-center">
-                                                    <h3 class="text-base font-bold text-white truncate">{{ prestamo.cliente_nombre }}</h3>
-                                                    <span class="text-[10px] font-bold px-2 py-0.5 rounded-full border"
-                                                          :class="getStatusBadge(prestamo.estado, prestamo.esta_en_mora).class">
-                                                        {{ getStatusBadge(prestamo.estado, prestamo.esta_en_mora).label }}
-                                                    </span>
-                                                </div>
-                                                <div class="flex justify-between items-center mt-1">
-                                                    <p class="text-lg text-gray-400 font-mono tracking-wide">{{ prestamo.codigo }}</p>
-                                                    <p class="text-sm font-bold text-gray-200">{{ formatCurrency(prestamo.monto) }}</p>
-                                                </div>
-                                            </div>
-                                            
-                                            <div class="text-gray-500 mt-1">
-                                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 transition-transform duration-200"
-                                                      :class="{ 'rotate-180': prestamosDesplegados[prestamo.id] }" viewBox="0 0 20 20" fill="currentColor">
-                                                     <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
-                                                 </svg>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div v-show="prestamosDesplegados[prestamo.id]" class="px-4 pb-4 pt-0 space-y-4 bg-[#222]">
-                                        <hr class="border-gray-700/50 mb-3" />
-                                        
-                                        <div>
-                                            <p class="text-[10px] text-gray-500 uppercase tracking-widest mb-2 font-bold flex items-center gap-1">
-                                                <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
-                                                Prenda
-                                            </p>
-                                            <ul class="text-xs space-y-1 text-gray-300 ml-1 border-l-2 border-gray-700 pl-2">
-                                                <li v-for="(art, idx) in prestamo.articulos" :key="idx">
-                                                    <span class="text-indigo-300 font-medium">{{ art.nombre }}</span> 
-                                                    <span class="opacity-70"> - {{ art.detalle }}</span>
-                                                </li>
-                                                <li v-if="prestamo.articulos.length === 0" class="italic text-gray-500">Sin detalles</li>
-                                            </ul>
-                                        </div>
-
-                                        <div class="grid grid-cols-2 gap-2 text-center text-xs">
-                                            <div class="bg-emerald-900/20 p-2 rounded-lg border border-emerald-500/10">
-                                                <span class="block text-emerald-400/70 text-[10px]">Capital Pagado</span>
-                                                <span class="font-bold text-emerald-300">{{ formatCurrency(prestamo.capital_recuperado) }}</span>
-                                            </div>
-                                            <div class="bg-amber-900/20 p-2 rounded-lg border border-amber-500/10">
-                                                <span class="block text-amber-400/70 text-[10px]">Interés Generado</span>
-                                                <span class="font-bold text-amber-300">{{ formatCurrency(prestamo.intereses_generados) }}</span>
-                                            </div>
-                                        </div>
-
-                                        <div>
-                                             <p class="text-[10px] text-gray-500 uppercase tracking-widest mb-1">Últimos Pagos (Interés)</p>
-                                             <div class="max-h-24 overflow-y-auto pr-1 custom-scrollbar">
-                                                <div v-for="pago in prestamo.historial_intereses" :key="pago.id" class="flex justify-between text-[11px] py-1 border-b border-gray-700/50 last:border-0">
-                                                    <span class="text-gray-400">{{ pago.fecha }}</span>
-                                                    <span class="text-amber-200 font-mono">{{ formatCurrency(pago.monto) }}</span>
-                                                </div>
-                                                <div v-if="prestamo.historial_intereses.length === 0" class="text-gray-600 text-[10px] italic py-1">Sin historial</div>
+                        <!-- Top Debtors (NEW) -->
+                        <div v-if="topDeudores.length > 0" class="bg-white dark:bg-[#1a1a1a] p-6 rounded-[24px] shadow-sm dark:shadow-lg border border-gray-200 dark:border-gray-800">
+                             <h4 class="text-xs font-bold text-gray-500 mb-4 uppercase tracking-widest flex items-center gap-2">
+                                <span class="w-2 h-2 rounded-full bg-indigo-500"></span>
+                                Mayores Deudores
+                            </h4>
+                            <div class="space-y-4">
+                                <div v-for="cliente in topDeudores" :key="cliente.id" class="flex items-center justify-between pb-3 border-b border-gray-100 dark:border-gray-800 last:border-0 last:pb-0">
+                                    <div class="flex items-center gap-3">
+                                        <div class="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden">
+                                             <img v-if="cliente.foto_url" :src="cliente.foto_url" class="w-full h-full object-cover">
+                                             <div v-else class="w-full h-full flex items-center justify-center text-gray-400 font-bold text-xs">
+                                                 {{ cliente.nombre.charAt(0) }}
                                              </div>
                                         </div>
-
-                                        <div class="bg-[#2A2A2A] rounded-lg p-2 text-center mt-2">
-                                            <p class="text-[10px] text-gray-500 uppercase">Próximo Vencimiento</p>
-                                            <p class="text-xs font-bold text-white mt-0.5">{{ prestamo.fecha_proximo_pago }}</p>
+                                        <div>
+                                            <p class="text-sm font-bold text-gray-900 dark:text-white">{{ cliente.nombre }}</p>
+                                            <p class="text-[10px] text-gray-500">{{ cliente.cantidad }} préstamos activos</p>
                                         </div>
                                     </div>
-
+                                    <div class="text-right">
+                                        <p class="text-sm font-black text-gray-900 dark:text-white">{{ formatCurrency(cliente.total_deuda) }}</p>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -253,20 +200,3 @@ const getStatusBadge = (estado, enMora) => {
         </div>
     </AuthenticatedLayout>
 </template>
-
-<style>
-/* Personalización de scrollbar para las listas internas */
-.custom-scrollbar::-webkit-scrollbar {
-    width: 4px;
-}
-.custom-scrollbar::-webkit-scrollbar-track {
-    background: rgba(255, 255, 255, 0.05);
-}
-.custom-scrollbar::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.2);
-    border-radius: 10px;
-}
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.3);
-}
-</style>

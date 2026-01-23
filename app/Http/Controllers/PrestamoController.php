@@ -182,9 +182,16 @@ class PrestamoController extends Controller
             'estado' => 'required|in:Activo,Pagado,Vencido,Cancelado'
         ]);
 
-        $prestamo->update([
-            'estado' => $request->estado
-        ]);
+        DB::transaction(function () use ($request, $prestamo) {
+            $prestamo->update([
+                'estado' => $request->estado
+            ]);
+
+            // Si el estado cambia a Pagado o RetiradoLogic, liberamos los articulos
+            if ($request->estado === 'Pagado') {
+                $prestamo->articulos()->update(['estado' => 'Retirado']);
+            }
+        });
 
         return back()->with('success', 'Estado del préstamo actualizado correctamente.');
     }

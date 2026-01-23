@@ -19,11 +19,11 @@ const submit = () => {
 
 <template>
     <Layout title="Nuevo Gasto">
-        <div class="py-12 bg-black min-h-screen">
+        <div class="py-12 bg-gray-50 dark:bg-[#0f0f0f] min-h-screen transition-colors duration-300">
             <div class="max-w-2xl mx-auto sm:px-6 lg:px-8">
-                <div class="bg-white overflow-hidden shadow-2xl rounded-2xl">
+                <div class="bg-white dark:bg-[#1a1a1a] overflow-hidden shadow-sm dark:shadow-xl rounded-2xl border border-gray-200 dark:border-gray-800 transition-all">
                     <div class="p-8">
-                        <h2 class="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
+                        <h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-6 flex items-center gap-2">
                             <span class="text-orange-500">💸</span> Registrar Nuevo Gasto
                         </h2>
 
@@ -34,7 +34,7 @@ const submit = () => {
                                 <TextInput
                                     id="descripcion"
                                     type="text"
-                                    class="mt-1 block w-full border-gray-300 focus:border-orange-500 focus:ring-orange-500 rounded-md shadow-sm"
+                                    class="mt-1 block w-full"
                                     v-model="form.descripcion"
                                     required
                                     autofocus
@@ -50,7 +50,7 @@ const submit = () => {
                                         id="monto"
                                         type="number"
                                         step="0.10"
-                                        class="mt-1 block w-full border-gray-300 focus:border-orange-500 focus:ring-orange-500 rounded-md shadow-sm"
+                                        class="mt-1 block w-full"
                                         v-model="form.monto"
                                         required
                                         placeholder="0.00"
@@ -63,7 +63,7 @@ const submit = () => {
                                     <TextInput
                                         id="fecha"
                                         type="date"
-                                        class="mt-1 block w-full border-gray-300 focus:border-orange-500 focus:ring-orange-500 rounded-md shadow-sm"
+                                        class="mt-1 block w-full"
                                         v-model="form.fecha"
                                         required
                                     />
@@ -71,16 +71,16 @@ const submit = () => {
                                 </div>
                             </div>
 
-                            <div class="flex items-center justify-end gap-4 pt-4 border-t border-gray-100">
+                            <div class="flex items-center justify-end gap-4 pt-4 border-t border-gray-100 dark:border-gray-800">
                                 <Link
                                     :href="route('gastos.index')"
-                                    class="text-sm text-gray-600 underline hover:text-gray-900"
+                                    class="text-sm text-gray-600 dark:text-gray-400 underline hover:text-gray-900 dark:hover:text-white transition-colors"
                                 >
                                     Cancelar
                                 </Link>
 
                                 <PrimaryButton
-                                    class="bg-orange-600 hover:bg-orange-700 focus:bg-orange-700 active:bg-orange-800"
+                                    class="bg-orange-600 hover:bg-orange-700 focus:bg-orange-700 active:bg-orange-800 border-transparent text-white"
                                     :class="{ 'opacity-25': form.processing }"
                                     :disabled="form.processing"
                                 >

@@ -41,6 +41,22 @@ class PagoController extends Controller
                 'referencia_id'   => $pago->id,
                 'referencia_tabla'=> 'pagos',
             ]);
+
+            // 3. AUTOMATIZACIÓN DE ESTADO: Verificar si se pagó el capital completo
+            if ($validated['tipo'] === 'Capital') {
+                $prestamo = Prestamo::find($validated['prestamo_id']);
+                $totalCapitalPagado = Pago::where('prestamo_id', $prestamo->id)
+                                        ->where('tipo_pago', 'Capital')
+                                        ->sum('monto_pagado');
+
+                // Si se ha pagado todo el capital (o más, por si acaso), cerramos el préstamo
+                if ($totalCapitalPagado >= $prestamo->monto) {
+                    $prestamo->update(['estado' => 'Pagado']);
+                    
+                    // Liberamos los artículos automáticamente
+                    $prestamo->articulos()->update(['estado' => 'Retirado']);
+                }
+            }
         });
 
         return back()->with('success', 'Pago registrado e ingresado a caja.');
