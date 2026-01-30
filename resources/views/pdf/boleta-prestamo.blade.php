@@ -60,7 +60,7 @@
         .ticket-number {
             font-size: 24px;
             font-weight: bold;
-            color: #d32f2f;
+            color: #057894ff;
         }
         .ticket-label {
             font-size: 10px;
@@ -74,15 +74,15 @@
             font-weight: bold;
             text-transform: uppercase;
             background: #f0f0f0;
-            padding: 4px 8px;
-            margin-bottom: 5px;
+            padding: 2px 2px;
+            margin-bottom: 2px;
             border-left: 4px solid #333;
         }
 
         .grid {
             display: table;
             width: 100%;
-            margin-bottom: 10px;
+            margin-bottom: 2px;
         }
         .col {
             display: table-cell;
@@ -121,7 +121,7 @@
         .terms {
             font-size: 8px;
             text-align: justify;
-            color: #555;
+            color: #000000ff;
             margin-top: 10px;
             line-height: 1.2;
             border: 1px solid #eee;
@@ -176,15 +176,14 @@
 </head>
 <body>
 
-@for ($copy = 1; $copy <= 2; $copy++)
     <div class="container">
         <div class="watermark">ORIGINAL</div>
         
         <div class="header">
             <div class="logo-section">
                 <!-- Ajusta la ruta del logo si es necesario o úsala base64 -->
-                @if(file_exists(public_path('logo2.jpg')))
-                    <img src="{{ public_path('logo2.jpg') }}" class="logo">
+                @if(file_exists(public_path('LOGO2026-01.jpg')))
+                    <img src="{{ public_path('LOGO2026-01.jpg') }}" class="logo">
                 @else
                     <div style="font-size:20px; font-weight:bold;">PRESTAMAX</div>
                 @endif
@@ -198,7 +197,7 @@
             <div class="ticket-info">
                 <div class="ticket-label">CONTRATO DE PRÉSTAMO</div>
                 <div class="ticket-number">{{ $prestamo->codigo }}</div>
-                <div style="font-size: 9px; color: #666; margin-top: 4px;">COPIA {{ $copy == 1 ? 'CLIENTE' : 'ARCHIVO' }}</div>
+                <div style="font-size: 9px; color: #666; margin-top: 4px;">COPIA CLIENTE</div>
             </div>
         </div>
 
@@ -214,12 +213,26 @@
             </div>
             <div class="col" style="width: 40%;">
                 <div class="section-title">DETALLES DEL PRÉSTAMO</div>
-                <div class="grid">
-                    <div class="col">
-                        <div class="field"><span class="label">FECHA INICIO:</span> <span class="value">{{ \Carbon\Carbon::parse($prestamo->fecha_prestamo)->format('d/m/Y') }}</span></div>
-                        <div class="field"><span class="label">VENCIMIENTO:</span> <span class="value" style="color: #d32f2f;">{{ \Carbon\Carbon::parse($prestamo->fecha_prestamo)->addDays(30)->format('d/m/Y') }}</span></div>
-                    </div>
-                </div>
+                <table style="width: 100%; margin-top: 5px;">
+                    <tr>
+                        <td style="border: none; padding: 2px 0;">
+                            <div class="label">FECHA INICIO</div>
+                            <div class="value">{{ \Carbon\Carbon::parse($prestamo->fecha_prestamo)->format('d/m/Y') }}</div>
+                        </td>
+                        <td style="border: none; padding: 2px 0; text-align: right;">
+                            <div class="label">VENCIMIENTO</div>
+                            <div class="value" style="color: #944805ff;">{{ \Carbon\Carbon::parse($prestamo->fecha_prestamo)->addDays(30)->format('d/m/Y') }}</div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td colspan="2" style="border: none; padding-top: 2px;">
+                            <div style="background: #f9f9f9; padding: 4px; border-radius: 4px; border: 1px solid #eee;">
+                                <span class="label">MULTA RETRASO:</span> 
+                                <span class="value" style="color: #c11306ff; margin-left: 5px;">{{ $prestamo->multa_por_retraso ?? '--' }}</span>
+                            </div>
+                        </td>
+                    </tr>
+                </table>
             </div>
         </div>
 
@@ -268,9 +281,7 @@
         </div>
     </div>
 
-    <!-- Salto de línea visual entre copias solo para separar en vista, el CSS print maneja márgenes -->
-    @if($copy == 1) <div style="border-top: 1px dotted #ccc; margin: 20px 0;"></div> @endif
-@endfor
+
 
 </body>
 </html>
