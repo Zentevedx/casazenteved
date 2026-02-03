@@ -153,6 +153,12 @@ onMounted(() => {
                         Gastos
                     </span>
                 </NavLink>
+                <NavLink :href="route('reportes.financiero')" :active="route().current('reportes.financiero')" :class="{'justify-center': isSidebarCollapsed}" :title="isSidebarCollapsed ? 'Reporte Financiero' : ''">
+                    <DocumentTextIcon class="w-5 h-5 shrink-0" />
+                     <span class="transition-all duration-300 overflow-hidden whitespace-nowrap" :class="[isSidebarCollapsed ? 'w-0 opacity-0 ml-0' : 'w-auto opacity-100 ml-3']">
+                        Reporte Financiero
+                    </span>
+                </NavLink>
             </nav>
 
             <!-- User Profile (Bottom Sidebar) -->
@@ -258,6 +264,9 @@ onMounted(() => {
                 </ResponsiveNavLink>
                 <ResponsiveNavLink :href="route('gastos.index')" :active="route().current('gastos.*')">
                     Gastos
+                </ResponsiveNavLink>
+                <ResponsiveNavLink :href="route('reportes.financiero')" :active="route().current('reportes.financiero')">
+                    Reporte Financiero
                 </ResponsiveNavLink>
 
                 <div class="border-t border-gray-800 mt-4 pt-4 px-4">

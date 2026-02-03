@@ -17,6 +17,7 @@ class Cliente extends Model
         'ci',
         'direccion',
         'telefono',
+        'fecha_nacimiento',
     ];
 
     // Relación: Un cliente tiene muchos préstamos

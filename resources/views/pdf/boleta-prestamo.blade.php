@@ -189,13 +189,13 @@
                 @endif
             </div>
             <div class="company-info">
-                <div class="company-name">Casa de Empeños</div>
+                <div class="company-name">Casa de Empeños "ZENTEVEDLU"</div>
                 <div>Av. Panamericana / Av. V. de Loreto</div>
                 <div>Cochabamba - Bolivia</div>
                 <div><strong>Whatsapp:</strong> 60763882 | <strong>NIT:</strong> 8420256011</div>
             </div>
             <div class="ticket-info">
-                <div class="ticket-label">CONTRATO DE PRÉSTAMO</div>
+                <div class="ticket-label">CÓDIGO DE PRÉSTAMO</div>
                 <div class="ticket-number">{{ $prestamo->codigo }}</div>
                 <div style="font-size: 9px; color: #666; margin-top: 4px;">COPIA CLIENTE</div>
             </div>

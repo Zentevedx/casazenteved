@@ -40,6 +40,7 @@ class ClienteController extends Controller
             'ci' => 'required|string|max:20|unique:clientes,ci',
             'direccion' => 'nullable|string|max:255',
             'telefono' => 'nullable|string|max:20',
+            'fecha_nacimiento' => 'nullable|date',
         ]);
 
         Cliente::create($validated);
@@ -61,6 +62,7 @@ class ClienteController extends Controller
             'ci' => 'required|string|max:20|unique:clientes,ci,' . $cliente->id,
             'direccion' => 'nullable|string|max:255',
             'telefono' => 'nullable|string|max:20',
+            'fecha_nacimiento' => 'nullable|date',
         ]);
 
         $cliente->update($validated);

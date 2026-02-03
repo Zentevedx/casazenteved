@@ -7,7 +7,10 @@ import SecondaryButton from '@/Components/SecondaryButton.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import InputLabel from '@/Components/InputLabel.vue';
 import TextInput from '@/Components/TextInput.vue';
-import { ArrowLeftIcon, DocumentTextIcon, PrinterIcon, PencilSquareIcon, TrashIcon, ClockIcon, CurrencyDollarIcon, BanknotesIcon } from '@heroicons/vue/24/outline'; // Icons import
+import { ArrowLeftIcon, DocumentTextIcon, PrinterIcon, PencilSquareIcon, TrashIcon, ClockIcon, CurrencyDollarIcon, BanknotesIcon, ExclamationTriangleIcon } from '@heroicons/vue/24/outline'; // Icons import
+import dayjs from 'dayjs'
+import relativeTime from 'dayjs/plugin/relativeTime'
+dayjs.extend(relativeTime)
 
 const props = defineProps({
     cliente: Object,
@@ -187,7 +190,7 @@ const irAEditarPrestamo = () => {
 
 // --- UTILIDADES ---
 const dinero = (v) => new Intl.NumberFormat('es-BO', { style: 'currency', currency: 'BOB' }).format(v);
-const fecha = (d) => new Date(d).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year:'numeric' });
+const fecha = (d) => new Date(d).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year:'numeric', timeZone: 'UTC' });
 
 const getStatusBadge = (estado) => {
     const styles = {
@@ -201,6 +204,11 @@ const getStatusBadge = (estado) => {
 
 const prestamosActivos = computed(() => props.prestamos.filter(p => ['Activo', 'Vencido'].includes(p.estado)));
 const prestamosHistorial = computed(() => props.prestamos.filter(p => ['Pagado', 'Cancelado'].includes(p.estado)));
+
+const calcularEdad = (fecha) => {
+    if (!fecha) return null;
+    return dayjs().diff(dayjs(fecha), 'year') + ' años';
+}
 </script>
 
 <template>
@@ -226,7 +234,12 @@ const prestamosHistorial = computed(() => props.prestamos.filter(p => ['Pagado',
                     </div>
                     <h2 class="text-xl font-bold text-white leading-tight px-4">{{ cliente.nombre }}</h2>
                     <div class="mt-2 space-y-1">
-                        <p class="text-xs font-mono text-gray-400 bg-gray-800/50 px-2 py-1 rounded inline-block">{{ cliente.ci }}</p>
+                        <div class="flex items-center justify-center gap-2">
+                            <p class="text-xs font-mono text-gray-400 bg-gray-800/50 px-2 py-1 rounded inline-block">{{ cliente.ci }}</p>
+                            <p v-if="cliente.fecha_nacimiento" class="text-xs font-bold text-gray-500 bg-gray-800/30 px-2 py-1 rounded inline-block">
+                                {{ calcularEdad(cliente.fecha_nacimiento) }}
+                            </p>
+                        </div>
                         <p class="text-sm text-gray-500">{{ cliente.telefono }}</p>
                     </div>
                     
@@ -367,6 +380,17 @@ const prestamosHistorial = computed(() => props.prestamos.filter(p => ['Pagado',
                                     <div class="flex justify-between items-end">
                                         <span class="text-gray-400 text-sm">Capital Prestado</span>
                                         <span class="text-2xl font-bold text-white">{{ dinero(selectedLoan.monto) }}</span>
+                                    </div>
+                                    
+                                    <div class="w-full h-px bg-gray-800"></div>
+
+                                    <div v-if="selectedLoan.multa_por_retraso > 0" class="flex justify-between items-center">
+                                        <span class="text-rose-400 text-sm font-bold flex items-center gap-1">
+                                            <ExclamationTriangleIcon class="w-4 h-4" /> Multa Retraso
+                                        </span>
+                                        <span class="text-lg font-bold text-rose-500">
+                                            {{ dinero(selectedLoan.multa_por_retraso) }}
+                                        </span>
                                     </div>
                                     
                                     <div class="w-full h-px bg-gray-800"></div>

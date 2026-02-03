@@ -9,7 +9,8 @@ const form = useForm({
   nombre: props.cliente.nombre,
   ci: props.cliente.ci,
   direccion: props.cliente.direccion,
-  telefono: props.cliente.telefono
+  telefono: props.cliente.telefono,
+  fecha_nacimiento: props.cliente.fecha_nacimiento
 })
 
 function actualizar() {
@@ -65,6 +66,13 @@ function actualizar() {
                         <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Teléfono / Celular</label>
                         <input v-model="form.telefono" type="text"
                             class="w-full px-4 py-3 rounded-xl bg-black/50 border border-gray-700 text-white focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all placeholder-gray-600"
+                        />
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Fecha de Nacimiento</label>
+                        <input v-model="form.fecha_nacimiento" type="date"
+                            class="w-full px-4 py-3 rounded-xl bg-black/50 border border-gray-700 text-white focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all placeholder-gray-600 appearance-none [&::-webkit-calendar-picker-indicator]:invert"
                         />
                     </div>
 

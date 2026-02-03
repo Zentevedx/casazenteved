@@ -102,9 +102,13 @@ Route::get('/estadisticas', [EstadisticasController::class, 'index'])->name('est
     // routes/web.php
 
 // Puedes mantener la ruta anterior o reemplazarla. Esta es la nueva:
-Route::get('/reportes/mensual/{year}/{month}', [ReporteController::class, 'reporteMensual'])
+Route::get('/reportes/financiero', [ReporteController::class, 'reporteFinanciero'])
     ->middleware(['auth', 'verified'])
-    ->name('reportes.mensual');
+    ->name('reportes.financiero');
+
+Route::get('/reportes/financiero/pdf', [ReporteController::class, 'generarPdfFinanciero'])
+    ->middleware(['auth', 'verified'])
+    ->name('reportes.financiero.pdf');
 
 });
 

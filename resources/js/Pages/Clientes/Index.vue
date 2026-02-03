@@ -4,6 +4,9 @@ import { router, Link } from '@inertiajs/vue3'
 import Layout from '@/Layouts/AuthenticatedLayout.vue'
 import Pagination from '@/Components/Pagination.vue'
 import { MagnifyingGlassIcon, UserPlusIcon, PencilSquareIcon, TrashIcon } from '@heroicons/vue/24/outline'
+import dayjs from 'dayjs'
+import relativeTime from 'dayjs/plugin/relativeTime'
+dayjs.extend(relativeTime)
 
 const props = defineProps({
   clientes: Object,
@@ -43,6 +46,11 @@ function eliminar(id) {
   if (confirm('¿Estás seguro de eliminar este cliente? Se borrará su historial.')) {
     router.delete(route('clientes.destroy', id))
   }
+}
+
+function calcularEdad(fecha) {
+    if (!fecha) return 'N/A';
+    return dayjs().diff(dayjs(fecha), 'year') + ' años';
 }
 </script>
 
@@ -99,6 +107,7 @@ function eliminar(id) {
                         <tr class="border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50 text-xs uppercase tracking-wider text-gray-500 font-bold">
                             <th class="px-6 py-5">Cliente</th>
                             <th class="px-6 py-5">Identificación (CI)</th>
+                            <th class="px-6 py-5">Edad</th>
                             <th class="px-6 py-5">Contacto</th>
                             <th class="px-6 py-5 text-right">Acciones</th>
                         </tr>
@@ -120,6 +129,9 @@ function eliminar(id) {
                                 <span class="bg-gray-100 dark:bg-gray-900 text-gray-600 dark:text-gray-400 px-3 py-1 rounded-lg border border-gray-200 dark:border-gray-800 font-mono text-xs">
                                     {{ cliente.ci }}
                                 </span>
+                            </td>
+                            <td class="px-6 py-4 text-gray-500 dark:text-gray-400 font-medium">
+                                {{ calcularEdad(cliente.fecha_nacimiento) }}
                             </td>
                             <td class="px-6 py-4 text-gray-500 dark:text-gray-400">
                                 {{ cliente.telefono || ' - ' }}

@@ -7,7 +7,8 @@ const form = useForm({
   nombre: '',
   ci: '',
   direccion: '',
-  telefono: ''
+  telefono: '',
+  fecha_nacimiento: ''
 })
 
 function guardar() {
@@ -61,6 +62,13 @@ function guardar() {
                         <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Teléfono / Celular</label>
                         <input v-model="form.telefono" type="text" placeholder="Ej: 777-12345"
                             class="w-full px-4 py-3 rounded-xl bg-black/50 border border-gray-700 text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all placeholder-gray-600"
+                        />
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Fecha de Nacimiento</label>
+                        <input v-model="form.fecha_nacimiento" type="date"
+                            class="w-full px-4 py-3 rounded-xl bg-black/50 border border-gray-700 text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all placeholder-gray-600 appearance-none [&::-webkit-calendar-picker-indicator]:invert"
                         />
                     </div>
 
