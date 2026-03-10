@@ -57,78 +57,106 @@
         </div>
     </div>
 
-    <!-- ESTADO DE CARTERA (Solo en Resumen) -->
-    @if($tipo === 'resumen')
-    <div class="stats-container" style="margin-top: 15px; border-top: 1px solid #ddd; padding-top: 15px;">
-        <div style="width: 100%; margin-bottom: 10px; font-weight: bold; color: #555; font-size: 11px;">ESTADO DE CARTERA ACTUAL</div>
-        <div class="stat-box">
-            <div class="stat-label">Dinero en Calle</div>
-            <div class="stat-value">Bs {{ number_format($cartera_total ?? 0, 2) }}</div>
-            <div style="font-size: 9px;">Total Prestado</div>
-        </div>
-        <div class="stat-box">
-            <div class="stat-label" style="color: #059669;">Cartera Vigente</div>
-            <div class="stat-value" style="color: #059669;">Bs {{ number_format($cartera_vigente ?? 0, 2) }}</div>
-            <div style="font-size: 9px;">Recuperable</div>
-        </div>
-        <div class="stat-box">
-            <div class="stat-label" style="color: #dc2626;">En Riesgo / Remate</div>
-            <div class="stat-value" style="color: #dc2626;">Bs {{ number_format($cartera_remate ?? 0, 2) }}</div>
-            <div style="font-size: 9px;">> 3 meses inact.</div>
-        </div>
-    </div>
-    @endif
+    
     
     <!-- CONTENIDO DINÁMICO SEGÚN TIPO -->
 
     <!-- 1. RESUMEN O REMATE -->
     @if($tipo === 'resumen' || $tipo === 'remate')
         @if($tipo === 'remate')
-            <div class="section-title">DETALLE DE PRÉSTAMOS EN REMATE</div>
+            <div class="section-title">DETALLE DE PRÉSTAMOS EN REMATE — CAPITAL EN RIESGO</div>
         @else
             <div class="section-title">RESUMEN DE PRÉSTAMOS EN RIESGO DE REMATE</div>
         @endif
-        
+
+        @php
+            $totalRemate = 0;
+        @endphp
+
         <table>
             <thead>
                 <tr>
                     <th>#</th>
                     <th>CÓDIGO</th>
                     <th>CLIENTE</th>
-                    <th>ARTÍCULOS</th>
-                    <th>MONTO</th>
-                    <th>ÚLTIMO PAGO INT.</th>
-                    <th>FECHA PRÉSTAMO</th>
-                    <th class="text-right">TIEMPO SIN PAGO</th>
+                    <th>ARTÍCULO(S)</th>
+                    <th>INICIO PRÉSTAMO</th>
+                    <th>ÚLTIMO PAGO</th>
+                    <th>DÍAS INACTIVO</th>
+                    <th>MESES</th>
+                    <th class="text-right">CAPITAL EN RIESGO</th>
                 </tr>
             </thead>
             <tbody>
                 @forelse($prestamosRemate as $p)
                     @php
-                        $uP = $p->pagos->where('tipo_pago', 'Interes')->sortByDesc('fecha_pago')->first();
-                        $fRef = $uP ? \Carbon\Carbon::parse($uP->fecha_pago) : \Carbon\Carbon::parse($p->fecha_prestamo);
-                        $meses = $fRef->diffInMonths(now())*1;
+                        // Usar campos pre-calculados si existen (desde reporteFinanciero)
+                        // Si no, calcular (desde generarPdfFinanciero / exportarExcelFinanciero)
+                        if (isset($p->dias_sin_pago)) {
+                            $diasSinPago   = $p->dias_sin_pago;
+                            $mesesSinPago  = $p->meses_sin_pago;
+                            $fechaUltPago  = $p->fecha_ultimo_pago;
+                        } else {
+                            $ultimoPago    = $p->pagos->sortByDesc('fecha_pago')->first();
+                            $fRef          = $ultimoPago
+                                ? \Carbon\Carbon::parse($ultimoPago->fecha_pago)
+                                : \Carbon\Carbon::parse($p->fecha_prestamo);
+                            $diasSinPago   = (int) $fRef->diffInDays(now());
+                            $mesesSinPago  = (int) $fRef->diffInMonths(now());
+                            $fechaUltPago  = $ultimoPago ? $ultimoPago->fecha_pago : null;
+                        }
+                        $saldo = $p->saldo_a_fecha ?? $p->monto;
+                        $totalRemate += $saldo;
+                        $urgenciaColor = $diasSinPago >= 180 ? '#dc2626' : '#f97316';
                     @endphp
                     <tr>
                         <td>{{ $loop->iteration }}</td>
                         <td><strong>{{ $p->codigo }}</strong></td>
                         <td>{{ $p->cliente->nombre }}</td>
-                        <td style="font-size: 9px; color: #555;">
-                            {{ $p->articulos->pluck('nombre')->join(', ') }}
+                        <td style="font-size: 8px; color: #555; max-width: 120px;">
+                            {{ $p->articulos->pluck('nombre')->join(', ') ?: 'Sin artículo' }}
                         </td>
-                        <td>Bs {{ number_format($p->monto, 2) }}</td>
-                        <td>{{ $uP ? \Carbon\Carbon::parse($uP->fecha_pago)->format('d/m/Y') : 'NINGUNO' }}</td>
                         <td>{{ \Carbon\Carbon::parse($p->fecha_prestamo)->format('d/m/Y') }}</td>
-                        <td class="text-right text-danger"><strong>{{ $meses }} meses</strong></td>
+                        <td>
+                            @if($fechaUltPago)
+                                {{ \Carbon\Carbon::parse($fechaUltPago)->format('d/m/Y') }}
+                            @else
+                                <span style="color: #dc2626; font-weight: bold;">NINGUNO</span>
+                            @endif
+                        </td>
+                        <td style="text-align: center; color: {{ $urgenciaColor }}; font-weight: bold;">
+                            {{ $diasSinPago }} días
+                        </td>
+                        <td style="text-align: center; color: {{ $urgenciaColor }}; font-weight: bold;">
+                            {{ $mesesSinPago }}m
+                        </td>
+                        <td class="text-right" style="font-weight: bold; color: #dc2626;">
+                            Bs {{ number_format($saldo, 2) }}
+                        </td>
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="6" style="text-align: center; padding: 20px; color: #999;">¡Excelente! No hay préstamos en situación de remate.</td>
+                        <td colspan="9" style="text-align: center; padding: 20px; color: #059669; font-weight: bold;">
+                            ✓ ¡Excelente! No hay préstamos en situación de remate.
+                        </td>
                     </tr>
                 @endforelse
             </tbody>
+            @if(count($prestamosRemate) > 0)
+            <tfoot>
+                <tr style="background: #fef2f2; border-top: 2px solid #dc2626;">
+                    <td colspan="8" style="font-weight: bold; color: #dc2626; font-size: 10px;">
+                        TOTAL CAPITAL EN RIESGO ({{ count($prestamosRemate) }} préstamos)
+                    </td>
+                    <td class="text-right" style="font-weight: bold; color: #dc2626; font-size: 11px;">
+                        Bs {{ number_format($totalRemate, 2) }}
+                    </td>
+                </tr>
+            </tfoot>
+            @endif
         </table>
     @endif
+
 
     <!-- 2. DETALLE DE PRÉSTAMOS -->
     @if($tipo === 'prestamos')

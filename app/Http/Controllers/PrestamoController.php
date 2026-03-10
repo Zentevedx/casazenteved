@@ -62,6 +62,9 @@ class PrestamoController extends Controller
         ]);
 
         DB::transaction(function () use ($request) {
+            // Generar código único para el comprobante
+            $codigoComprobante = 'PRE-' . strtoupper(Str::random(8));
+
             // 1. Crear el Préstamo
             $prestamo = Prestamo::create([
                 'codigo' => $request->codigo,
@@ -69,6 +72,7 @@ class PrestamoController extends Controller
                 'monto' => $request->monto,
                 'fecha_prestamo' => $request->fecha_prestamo,
                 'multa_por_retraso' => $request->multa_por_retraso,
+                'codigo_comprobante' => $codigoComprobante,
             ]);
 
             // Guardar artículos

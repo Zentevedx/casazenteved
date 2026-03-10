@@ -163,7 +163,7 @@ onUnmounted(() => window.removeEventListener('keydown', handleKeydown));
         leave-to-class="opacity-0 translate-y-2 scale-95"
     >
       <div v-if="showModal" 
-           class="absolute z-50 mt-4 bg-[#1a1a1a] rounded-2xl shadow-2xl border border-gray-800 overflow-hidden 
+           class="absolute z-[100] mt-4 bg-[#1a1a1a] rounded-2xl shadow-2xl border border-gray-800 overflow-hidden 
                   w-[95vw] sm:w-full -left-4 sm:left-0 origin-top transform backdrop-blur-xl ring-1 ring-white/5">
         
         <!-- Results List -->

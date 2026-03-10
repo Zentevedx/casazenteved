@@ -7,6 +7,7 @@ use App\Models\Prestamo;
 use App\Models\Caja; // <--- IMPORTANTE: Modelo Caja importado
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class PagoController extends Controller
 {
@@ -20,12 +21,16 @@ class PagoController extends Controller
         ]);
 
         DB::transaction(function () use ($validated) {
+            // Generar código único para el comprobante
+            $codigoComprobante = 'PAG-' . strtoupper(Str::random(8));
+
             // 1. Registrar el Pago en el historial del préstamo
             $pago = Pago::create([
                 'prestamo_id' => $validated['prestamo_id'],
                 'tipo_pago' => $validated['tipo'],
                 'monto_pagado' => $validated['monto'],
                 'fecha_pago' => $validated['fecha_pago'],
+                'codigo_comprobante' => $codigoComprobante,
             ]);
 
             // 2. AUTOMATIZACIÓN CAJA: Registrar Entrada (Ingreso)

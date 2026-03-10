@@ -1,14 +1,14 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, computed, watch } from 'vue';
 import ApplicationLogo from '@/Components/ApplicationLogo.vue';
 import Dropdown from '@/Components/Dropdown.vue';
 import DropdownLink from '@/Components/DropdownLink.vue';
 import NavLink from '@/Components/NavLink.vue';
 import ResponsiveNavLink from '@/Components/ResponsiveNavLink.vue';
-import { Link } from '@inertiajs/vue3';
+import { Link, usePage, router } from '@inertiajs/vue3';
 import BuscadorGlobal from '@/Components/BuscadorGlobal.vue';
 
-// Importamos iconos profesionales de Heroicons (ya incluido en tu package.json)
+// Importamos iconos profesionales de Heroicons
 import { 
     Squares2X2Icon, 
     UsersIcon, 
@@ -21,7 +21,10 @@ import {
     SunIcon,
     MoonIcon,
     ChevronLeftIcon,
-    ChevronRightIcon
+    ChevronRightIcon,
+    CheckCircleIcon,
+    XCircleIcon,
+    XMarkIcon
 } from '@heroicons/vue/24/outline';
 
 const showingNavigationDropdown = ref(false);
@@ -62,6 +65,37 @@ onMounted(() => {
         isSidebarCollapsed.value = savedSidebarState === 'true';
     }
 });
+
+// --- Backup Functionality ---
+const isBackingUp = ref(false);
+
+const handleBackup = () => {
+    if (isBackingUp.value) return;
+
+    router.get(route('backup.create'), {}, {
+        onStart: () => {
+            isBackingUp.value = true;
+        },
+        onFinish: () => {
+            isBackingUp.value = false;
+        }
+    });
+};
+
+// --- Flash Messages ---
+const page = usePage();
+const flashSuccess = computed(() => page.props.flash?.success);
+const flashError = computed(() => page.props.flash?.error);
+const showFlash = ref(false);
+
+watch([flashSuccess, flashError], () => {
+    if (flashSuccess.value || flashError.value) {
+        showFlash.value = true;
+        setTimeout(() => {
+            showFlash.value = false;
+        }, 5000); // Auto hide after 5 seconds
+    }
+});
 </script>
 
 <template>
@@ -69,7 +103,7 @@ onMounted(() => {
         
         <!-- SIDEBAR (Desktop) -->
         <aside 
-            class="hidden md:flex flex-col bg-white dark:bg-[#141414] border-r border-gray-200 dark:border-gray-800 transition-all duration-300 ease-in-out relative"
+            class="hidden md:flex flex-col bg-white dark:bg-[#141414] border-r border-gray-200 dark:border-gray-800 transition-all duration-300 ease-in-out relative z-30"
             :class="isSidebarCollapsed ? 'w-20' : 'w-72'"
         >
             <!-- Logo area -->
@@ -78,17 +112,17 @@ onMounted(() => {
             >
                 <Link :href="route('dashboard')" class="flex items-center gap-3 group overflow-hidden whitespace-nowrap">
                     <div class="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white font-black shadow-lg shadow-indigo-500/20 group-hover:scale-105 transition shrink-0">
-                        <span>P</span>
+                        <span>Z</span>
                     </div>
                     <span 
                         class="text-gray-900 dark:text-white font-bold text-lg tracking-tight group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition duration-300"
                         :class="[isSidebarCollapsed ? 'opacity-0 w-0' : 'opacity-100 w-auto']"
                     >
-                        PrestaMax
+                        ZebtevedLu
                     </span>
                 </Link>
 
-                <!-- Collapse Button (Only shown when expanded to push it to right, or absolutely positioned) -->
+                <!-- Collapse Button -->
                <button 
                     @click="toggleSidebar" 
                     class="p-1 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition-colors"
@@ -159,46 +193,96 @@ onMounted(() => {
                         Reporte Financiero
                     </span>
                 </NavLink>
+                <div v-if="$page.props.auth.user.role === 'admin'" class="pt-4 pb-2 transition-all duration-300" :class="isSidebarCollapsed ? 'opacity-0 h-0 border-t border-gray-800 my-2' : 'opacity-100 h-auto'">
+                    <p class="px-4 text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest whitespace-nowrap overflow-hidden">Sistema</p>
+                </div>
+
+                <button 
+                    v-if="$page.props.auth.user.role === 'admin'" 
+                    @click="handleBackup"
+                    :disabled="isBackingUp"
+                    class="flex items-center w-full px-3 py-2 text-sm font-medium transition-colors duration-150 rounded-lg group"
+                    :class="[
+                        route().current('backup.*') 
+                            ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300' 
+                            : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800',
+                        {'justify-center': isSidebarCollapsed, 'opacity-50 cursor-not-allowed': isBackingUp}
+                    ]"
+                    :title="isSidebarCollapsed ? 'Respaldos' : ''"
+                >
+                    <ArchiveBoxIcon class="w-5 h-5 shrink-0" :class="{'animate-spin': isBackingUp}" />
+                    <span 
+                        class="transition-all duration-300 overflow-hidden whitespace-nowrap" 
+                        :class="[isSidebarCollapsed ? 'w-0 opacity-0 ml-0' : 'w-auto opacity-100 ml-3']"
+                    >
+                        {{ isBackingUp ? 'Respaldando...' : 'Respaldos BD' }}
+                    </span>
+                </button>
             </nav>
 
             <!-- User Profile (Bottom Sidebar) -->
             <div class="p-4 border-t border-gray-200 dark:border-gray-800 relative">
-                <Dropdown align="top" width="48">
-                    <template #trigger>
-                        <button class="flex items-center gap-3 w-full p-2 rounded-xl hover:bg-gray-800 transition text-left group"
-                             :class="{'justify-center': isSidebarCollapsed}"
-                        >
-                            <div class="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white font-bold text-sm shadow-inner shrink-0">
-                                {{ $page.props.auth.user.name.charAt(0) }}
-                            </div>
-                            <div class="flex-1 overflow-hidden transition-all duration-300"
-                                :class="[isSidebarCollapsed ? 'w-0 opacity-0 ml-0' : 'w-auto opacity-100']"
-                            >
-                                <p class="text-sm font-medium text-gray-700 dark:text-white truncate group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition">{{ $page.props.auth.user.name }}</p>
-                                <p class="text-xs text-gray-500 truncate">Ver opciones</p>
-                            </div>
-                            <svg v-if="!isSidebarCollapsed" class="w-4 h-4 text-gray-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l4-4 4 4m0 6l-4 4-4-4" />
-                            </svg>
-                        </button>
-                    </template>
-
-                    <template #content>
-                        <div class="py-1 bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-700 rounded-md shadow-xl" :class="{'ml-12': isSidebarCollapsed}">
-                             <!-- Adjustment for dropdown position when collapsed might be needed or let it float -->
-                            <DropdownLink :href="route('profile.edit')" class="text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white"> Perfil </DropdownLink>
-                            <DropdownLink :href="route('logout')" method="post" as="button" class="text-gray-300 hover:bg-gray-800 hover:text-red-400"> Cerrar Sesión </DropdownLink>
-                        </div>
-                    </template>
-                </Dropdown>
+                <Link 
+                    :href="route('profile.edit')" 
+                    class="flex items-center gap-3 w-full p-2 rounded-xl hover:bg-gray-100 hover:text-gray-900 dark:hover:bg-gray-800 transition text-left group"
+                    :class="{'justify-center': isSidebarCollapsed}"
+                >
+                    <div class="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white font-bold text-sm shadow-inner shrink-0">
+                        {{ $page.props.auth.user.name.charAt(0) }}
+                    </div>
+                    <div class="flex-1 overflow-hidden transition-all duration-300"
+                        :class="[isSidebarCollapsed ? 'w-0 opacity-0 ml-0' : 'w-auto opacity-100']"
+                    >
+                        <p class="text-sm font-medium text-gray-700 dark:text-white truncate group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition">{{ $page.props.auth.user.name }}</p>
+                        <p class="text-xs text-gray-500 truncate">Ver perfil</p>
+                    </div>
+                    <svg v-if="!isSidebarCollapsed" class="w-4 h-4 text-gray-400 group-hover:text-gray-600 dark:text-gray-500 dark:group-hover:text-gray-300 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                    </svg>
+                </Link>
             </div>
         </aside>
 
         <!-- MAIN CONTENT AREA -->
-        <div class="flex-1 flex flex-col min-w-0 bg-gray-50 dark:bg-dark-bg transition-all duration-300">
+        <div class="flex-1 flex flex-col min-w-0 bg-gray-50 dark:bg-dark-bg transition-all duration-300 relative">
             
+            <!-- FLASH MESSAGES (Toast) -->
+            <Transition
+                enter-active-class="transform ease-out duration-300 transition"
+                enter-from-class="translate-y-2 opacity-0 sm:translate-y-0 sm:translate-x-2"
+                enter-to-class="translate-y-0 opacity-100 sm:translate-x-0"
+                leave-active-class="transition ease-in duration-100"
+                leave-from-class="opacity-100"
+                leave-to-class="opacity-0"
+            >
+                <div v-if="showFlash && (flashSuccess || flashError)" class="absolute top-20 right-4 z-50 max-w-sm w-full bg-white dark:bg-gray-800 shadow-lg rounded-lg pointer-events-auto ring-1 ring-black ring-opacity-5 overflow-hidden">
+                    <div class="p-4">
+                        <div class="flex items-start">
+                            <div class="flex-shrink-0">
+                                <CheckCircleIcon v-if="flashSuccess" class="h-6 w-6 text-green-400" aria-hidden="true" />
+                                <XCircleIcon v-else class="h-6 w-6 text-red-400" aria-hidden="true" />
+                            </div>
+                            <div class="ml-3 w-0 flex-1 pt-0.5">
+                                <p class="text-sm font-medium text-gray-900 dark:text-white">
+                                    {{ flashSuccess ? '¡Éxito!' : 'Error' }}
+                                </p>
+                                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                                    {{ flashSuccess || flashError }}
+                                </p>
+                            </div>
+                            <div class="ml-4 flex-shrink-0 flex">
+                                <button @click="showFlash = false" class="bg-white dark:bg-gray-800 rounded-md inline-flex text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                                    <span class="sr-only">Cerrar</span>
+                                    <XMarkIcon class="h-5 w-5" aria-hidden="true" />
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </Transition>
+
             <!-- TOP NAVBAR (Mobile & Search) -->
-            <header class="h-16 flex items-center justify-between px-4 sm:px-6 lg:px-8 border-b border-gray-200 dark:border-gray-800 bg-white/80 dark:bg-[#0f0f0f]/80 backdrop-blur-sm z-20">
+            <header class="h-16 flex items-center justify-between px-4 sm:px-6 lg:px-8 border-b border-gray-200 dark:border-gray-800 bg-white/80 dark:bg-[#0f0f0f]/80 backdrop-blur-sm z-40">
                 
                 <!-- Mobile Menu Button -->
                 <div class="md:hidden flex items-center">

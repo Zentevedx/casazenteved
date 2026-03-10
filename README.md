@@ -1,61 +1,85 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Casa Zenteved - Sistema de Gestión de Préstamos
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Este sistema es una aplicación web desarrollada con Laravel (backend) y Vue.js/Inertia (frontend) para la gestión de una casa de empeños o préstamos. Permite administrar clientes, préstamos, artículos de garantía, caja chica y visualizar reportes financieros.
 
-## About Laravel
+## Descripción del Sistema
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+El sistema cuenta con los siguientes módulos principales:
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+-   **Dashboard**: Vista general con estadísticas rápidas y accesos directos.
+-   **Gestión de Clientes**: Registro, edición y visualización del historial de clientes.
+-   **Gestión de Préstamos**: Creación de préstamos, cálculo de intereses y fechas de vencimiento, generación de contratos PDF.
+-   **Artículos**: Inventario de artículos dejados en garantía.
+-   **Caja Chica**: Control de ingresos y egresos diarios.
+-   **Reportes**: Reportes financieros y estadísticas de rendimiento.
+-   **Sistema (Admin)**: Herramientas de respaldo de base de datos.
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+## Seguridad y Roles
 
-## Learning Laravel
+El sistema implementa un control de acceso basado en roles:
+-   **Admin**: Tiene acceso total, incluyendo la generación de respaldos de base de datos.
+-   **User**: Tiene acceso a la gestión operativa pero no a herramientas del sistema sensibles.
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+**Nota de Seguridad**: El registro de nuevos usuarios (`/register`) está deshabilitado públicamente. Para agregar nuevos usuarios, se debe hacer directamente en la base de datos o habilitar temporalmente la ruta.
 
-You may also try the [Laravel Bootcamp](https://bootcamp.laravel.com), where you will be guided through building a modern Laravel application from scratch.
+## Copias de Seguridad (Backups)
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+El sistema integra `spatie/laravel-backup` para realizar copias seguridad de la base de datos.
 
-## Laravel Sponsors
+-   **Ubicación**: Los respaldos se guardan en el servidor en la ruta `storage/app/public/Laravel`.
+-   **Protección**: Los archivos ZIP generados están protegidos con contraseña (definida en las variables de entorno).
+-   **Generación**: Solo los usuarios con rol `admin` pueden iniciar un respaldo desde la barra lateral ("Sistema" -> "Respaldos BD").
+-   **Importante**: **NUNCA** guardes los respaldos en el repositorio Git. Asegúrate de descargarlos periódicamente mediante SFTP/SSH si necesitas guardarlos externamente.
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+## Instrucciones de Despliegue (Deployment)
 
-### Premium Partners
+Para poner en marcha el proyecto en un nuevo servidor, sigue estos pasos:
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+### 1. Requisitos del Servidor
+-   PHP >= 8.2
+-   Composer
+-   Node.js & NPM
+-   MySQL (u otro motor de base de datos soportado)
+-   Extensiones PHP: `bcmath`, `ctype`, `fileinfo`, `json`, `mbstring`, `openssl`, `pdo`, `tokenizer`, `xml`, `zip`, `dom`.
+-   **Importante**: Para que los respaldos funcionen, el servidor debe tener instalada la herramienta `mysqldump` (o la correspondiente a tu BD) y ser accesible desde la línea de comandos.
 
-## Contributing
+### 2. Instalación
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+```bash
+# 1. Clonar el repositorio
+git clone <url-del-repositorio>
+cd casazenteved
 
-## Code of Conduct
+# 2. Instalar dependencias de PHP
+composer install --optimize-autoloader --no-dev
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+# 3. Instalar dependencias de JS y compilar assets
+npm install
+npm run build
 
-## Security Vulnerabilities
+# 4. Configurar variables de entorno
+cp .env.example .env
+# Edita .env y configura tu base de datos (DB_HOST, DB_DATABASE, DB_USERNAME, DB_PASSWORD)
+# Configura BACKUP_ARCHIVE_PASSWORD='tu_contraseña_secreta_para_zips'
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+# 5. Generar clave de aplicación
+php artisan key:generate
 
-## License
+# 6. Crear enlace simbólico para storage (opcional, si usas archivos públicos)
+php artisan storage:link
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+# 7. Ejecutar migraciones
+php artisan migrate --force
+```
+
+### 3. Configuración del Primer Admin
+Por defecto, los usuarios se crean con el rol `user`. Para promover un usuario a `admin`:
+
+1.  Regístralo (o habilita temporalmente el registro).
+2.  Accede a la base de datos y ejecuta:
+    ```sql
+    UPDATE users SET role = 'admin' WHERE email = 'tu@email.com';
+    ```
+
+## Soporte
+Para problemas técnicos, contactar al desarrollador encargado.

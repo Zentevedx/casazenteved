@@ -28,6 +28,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\GastoController; // <-- No olvides importar arriba
 // ... imports
 use App\Http\Controllers\CajaController;
+use App\Http\Controllers\VencimientoController;
 
 // ... dentro del middleware 'auth'
 
@@ -51,6 +52,8 @@ Route::get('/', function () {
         'phpVersion'     => PHP_VERSION,
     ]);
 });
+
+
 
 
 
@@ -96,6 +99,9 @@ Route::get('/estadisticas', [EstadisticasController::class, 'index'])->name('est
     // routes/web.php
     Route::get('/semana-clientes', [SemanaClientesController::class, 'index'])->name('semana-clientes');
 
+    /* TABLERO DE COBRANZA (JSON para componente del Dashboard) */
+    Route::get('/api/vencimientos', [VencimientoController::class, 'index'])->name('vencimientos.index');
+
     /* SEMANA DE PRÉSTAMOS */
     Route::get('/dashboard/semana-prestamos', [SemanaClientesController::class, 'index'])
     ->name('dashboard.semana-prestamos');
@@ -110,7 +116,17 @@ Route::get('/reportes/financiero/pdf', [ReporteController::class, 'generarPdfFin
     ->middleware(['auth', 'verified'])
     ->name('reportes.financiero.pdf');
 
+Route::get('/reportes/financiero/excel', [ReporteController::class, 'exportarExcelFinanciero'])
+    ->middleware(['auth', 'verified'])
+    ->name('reportes.financiero.excel');
+
+    // Admin only routes
+    Route::middleware(['admin'])->group(function () {
+        Route::get('/backup/create', [App\Http\Controllers\BackupController::class, 'create'])->name('backup.create');
+    });
 });
+
+
 
 /*
 |--------------------------------------------------------------------------
@@ -118,3 +134,4 @@ Route::get('/reportes/financiero/pdf', [ReporteController::class, 'generarPdfFin
 |--------------------------------------------------------------------------
 */
 require __DIR__.'/auth.php';
+

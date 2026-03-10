@@ -15,6 +15,7 @@ class Prestamo extends Model
         'fecha_prestamo',
         'estado',
         'multa_por_retraso',
+        'codigo_comprobante',
     ];
 
     public function cliente()

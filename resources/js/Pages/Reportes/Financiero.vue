@@ -5,6 +5,10 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import DetallePrestamos from '@/Components/Reportes/DetallePrestamos.vue';
 import DetallePagos from '@/Components/Reportes/DetallePagos.vue';
 import DetalleGastos from '@/Components/Reportes/DetalleGastos.vue';
+import DetalleRemate from '@/Components/Reportes/DetalleRemate.vue';
+import AgingCartera from '@/Components/Reportes/AgingCartera.vue';
+import EficienciaCobranza from '@/Components/Reportes/EficienciaCobranza.vue';
+import AlertasTemprana from '@/Components/Reportes/AlertasTemprana.vue';
 import dayjs from 'dayjs'
 import 'dayjs/locale/es'
 import utc from 'dayjs/plugin/utc'
@@ -20,7 +24,9 @@ import {
     ClockIcon,
     ChartPieIcon,
     ListBulletIcon,
-    PrinterIcon
+    PrinterIcon,
+    TableCellsIcon,
+    HeartIcon
 } from '@heroicons/vue/24/outline';
 
 dayjs.extend(utc)
@@ -30,7 +36,8 @@ const props = defineProps({
     stats: Object,
     listas: Object,
     prestamosRemate: Array,
-    filters: Object
+    filters: Object,
+    salud: Object,
 })
 
 const selectedModo = ref(props.filters.modo)
@@ -100,6 +107,17 @@ const downloadRematePdf = () => {
     window.open(url, '_blank');
 }
 
+const downloadExcel = () => {
+    const url = route('reportes.financiero.excel', {
+        modo: selectedModo.value,
+        year: selectedYear.value,
+        month: selectedMonth.value,
+        week: selectedWeek.value,
+        tipo: activeTab.value // Exporta según el tab activo
+    });
+    window.open(url, '_blank');
+}
+
 const modos = [
     { value: 'mensual', label: 'Mensual', icon: CalendarDaysIcon },
     { value: 'semanal', label: 'Semanal', icon: ClockIcon },
@@ -113,6 +131,7 @@ const tabs = [
     { id: 'gastos', label: 'Gastos', icon: ShoppingBagIcon },
     { id: 'capital', label: 'Capital Recup.', icon: ArrowPathIcon },
     { id: 'remate', label: 'En Remate', icon: ExclamationTriangleIcon },
+    { id: 'salud', label: 'Salud del Negocio', icon: HeartIcon },
 ]
 </script>
 
@@ -194,108 +213,177 @@ const tabs = [
                 </div>
 
                 <!-- Tab Content: RESUMEN -->
-                <div v-if="activeTab === 'resumen'" class="space-y-8 fade-in">
+                <div v-if="activeTab === 'resumen'" class="space-y-6 fade-in">
                     
-                    <div class="flex justify-end">
-                        <button 
-                            @click="downloadPdf"
-                            class="inline-flex items-center px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 border border-transparent rounded-xl font-semibold text-xs text-white uppercase tracking-widest hover:from-indigo-700 hover:to-purple-700 shadow-lg"
-                        >
-                            <ArrowDownTrayIcon class="w-4 h-4 mr-2" />
-                            Descargar Resumen PDF
+                    <!-- Botones de exportación -->
+                    <div class="flex justify-end gap-4">
+                        <button @click="downloadExcel" class="inline-flex items-center px-4 py-2.5 bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800 rounded-xl font-bold text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 shadow-sm transition-colors">
+                            <TableCellsIcon class="w-5 h-5 mr-2" /> Exportar a Excel
+                        </button>
+                        <button @click="downloadPdf" class="inline-flex items-center px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 border border-transparent rounded-xl font-semibold text-xs text-white uppercase tracking-widest hover:from-indigo-700 hover:to-purple-700 shadow-lg transition-transform hover:scale-105">
+                            <ArrowDownTrayIcon class="w-4 h-4 mr-2" /> Descargar PDF
                         </button>
                     </div>
 
-                    <!-- KPIs Grid -->
-                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                        <!-- Préstamos -->
-                        <div class="group bg-white dark:bg-[#1a1a1a] p-6 rounded-2xl shadow-lg border border-gray-100 dark:border-gray-800">
-                            <p class="text-xs text-gray-500 dark:text-gray-400 uppercase font-bold tracking-wider mb-1">Préstamos Otorgados</p>
-                            <h3 class="text-3xl font-black text-gray-900 dark:text-white">{{ formatCurrency(stats.prestamos) }}</h3>
-                            <p class="text-xs text-gray-400 mt-2">{{ stats.cantidad_prestamos }} operaciones</p>
-                        </div>
-                        <!-- Intereses -->
-                        <div class="group bg-white dark:bg-[#1a1a1a] p-6 rounded-2xl shadow-lg border border-gray-100 dark:border-gray-800">
-                            <p class="text-xs text-gray-500 dark:text-gray-400 uppercase font-bold tracking-wider mb-1">Intereses Cobrados</p>
-                            <h3 class="text-3xl font-black text-gray-900 dark:text-white">{{ formatCurrency(stats.intereses) }}</h3>
-                            <p class="text-xs text-emerald-500 mt-2 font-semibold">+ Ganancia neta</p>
-                        </div>
-                        <!-- Capital -->
-                        <div class="group bg-white dark:bg-[#1a1a1a] p-6 rounded-2xl shadow-lg border border-gray-100 dark:border-gray-800">
-                            <p class="text-xs text-gray-500 dark:text-gray-400 uppercase font-bold tracking-wider mb-1">Capital Recuperado</p>
-                            <h3 class="text-3xl font-black text-gray-900 dark:text-white">{{ formatCurrency(stats.capital_recuperado) }}</h3>
-                        </div>
-                        <!-- Gastos -->
-                        <div class="group bg-white dark:bg-[#1a1a1a] p-6 rounded-2xl shadow-lg border border-gray-100 dark:border-gray-800">
-                            <p class="text-xs text-gray-500 dark:text-gray-400 uppercase font-bold tracking-wider mb-1">Gastos Operativos</p>
-                            <h3 class="text-3xl font-black text-gray-900 dark:text-white">{{ formatCurrency(stats.gastos) }}</h3>
-                            <p class="text-xs text-red-500 mt-2 font-semibold">- Egresos</p>
+                    <!-- KPIs Fila 1: Movimiento del período -->
+                    <div>
+                        <p class="text-xs font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-3">📊 Movimiento del Período</p>
+                        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                            <div class="bg-white dark:bg-[#1a1a1a] p-5 rounded-2xl shadow-md border border-gray-100 dark:border-gray-800 border-l-4 border-l-indigo-500">
+                                <p class="text-xs text-gray-500 dark:text-gray-400 uppercase font-bold tracking-wider mb-1">Préstamos Otorgados</p>
+                                <h3 class="text-2xl font-black text-gray-900 dark:text-white">{{ formatCurrency(stats.prestamos) }}</h3>
+                                <p class="text-xs text-gray-400 mt-1.5">{{ stats.cantidad_prestamos }} operaciones</p>
+                                <p class="text-xs text-indigo-500 font-semibold mt-0.5">Ticket prom.: {{ stats.cantidad_prestamos > 0 ? formatCurrency(stats.prestamos / stats.cantidad_prestamos) : 'N/A' }}</p>
+                            </div>
+                            <div class="bg-white dark:bg-[#1a1a1a] p-5 rounded-2xl shadow-md border border-gray-100 dark:border-gray-800 border-l-4 border-l-emerald-500">
+                                <p class="text-xs text-gray-500 dark:text-gray-400 uppercase font-bold tracking-wider mb-1">Intereses Cobrados</p>
+                                <h3 class="text-2xl font-black text-emerald-700 dark:text-emerald-400">{{ formatCurrency(stats.intereses) }}</h3>
+                                <p class="text-xs text-gray-400 mt-1.5">Ingresos del período</p>
+                                <p class="text-xs text-emerald-500 font-semibold mt-0.5">
+                                    ROI: {{ salud?.interes_proyectado > 0 ? ((stats.intereses / stats.prestamos) * 100).toFixed(1) + '%' : 'N/A' }}
+                                </p>
+                            </div>
+                            <div class="bg-white dark:bg-[#1a1a1a] p-5 rounded-2xl shadow-md border border-gray-100 dark:border-gray-800 border-l-4 border-l-blue-500">
+                                <p class="text-xs text-gray-500 dark:text-gray-400 uppercase font-bold tracking-wider mb-1">Capital Recuperado</p>
+                                <h3 class="text-2xl font-black text-blue-700 dark:text-blue-400">{{ formatCurrency(stats.capital_recuperado) }}</h3>
+                                <p class="text-xs text-gray-400 mt-1.5">Préstamos cancelados</p>
+                            </div>
+                            <div class="bg-white dark:bg-[#1a1a1a] p-5 rounded-2xl shadow-md border border-gray-100 dark:border-gray-800 border-l-4 border-l-red-500">
+                                <p class="text-xs text-gray-500 dark:text-gray-400 uppercase font-bold tracking-wider mb-1">Gastos Operativos</p>
+                                <h3 class="text-2xl font-black text-red-600 dark:text-red-400">{{ formatCurrency(stats.gastos) }}</h3>
+                                <p class="text-xs text-gray-400 mt-1.5">Egresos del período</p>
+                                <p class="text-xs text-red-500 font-semibold mt-0.5">
+                                    {{ stats.intereses > 0 ? ((stats.gastos / stats.intereses) * 100).toFixed(1) + '% de intereses' : '' }}
+                                </p>
+                            </div>
                         </div>
                     </div>
 
-                    <!-- Summary Card -->
-                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                        <!-- Resultados Financieros -->
-                        <div class="bg-gradient-to-r from-gray-900 to-gray-800 p-8 rounded-2xl shadow-xl text-white">
-                            <h3 class="text-xl font-bold mb-6 flex items-center gap-2">
-                                <ChartPieIcon class="w-6 h-6 text-indigo-400" />
-                                Resultados del Periodo
+                    <!-- Resultados + Cartera + Eficiencia (3 columnas en escritorio) -->
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+
+                        <!-- Panel de Resultados -->
+                        <div class="bg-gradient-to-br from-gray-900 to-gray-800 p-6 rounded-2xl shadow-xl text-white">
+                            <h3 class="text-sm font-bold mb-5 flex items-center gap-2 text-gray-300 uppercase tracking-widest">
+                                <ChartPieIcon class="w-4 h-4 text-indigo-400" /> Resultados del Período
                             </h3>
-                            <div class="space-y-6">
-                                <div>
-                                    <p class="text-gray-400 text-sm font-medium uppercase tracking-wider mb-2">Utilidad Bruta (Ganancia)</p>
-                                    <h3 class="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-emerald-500">
+                            <div class="space-y-4">
+                                <div class="pb-4 border-b border-gray-700">
+                                    <p class="text-gray-400 text-xs uppercase tracking-wider mb-1">Utilidad Bruta</p>
+                                    <p class="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-emerald-500">
                                         {{ formatCurrency(stats.intereses - stats.gastos) }}
-                                    </h3>
-                                    <p class="text-gray-500 text-xs mt-1">Intereses - Gastos</p>
+                                    </p>
+                                    <p class="text-gray-500 text-xs mt-0.5">Intereses − Gastos</p>
                                 </div>
-                                <div class="border-t border-gray-700 pt-4">
-                                    <p class="text-gray-400 text-sm font-medium uppercase tracking-wider mb-2">Flujo Neto</p>
-                                    <h3 class="text-3xl font-bold text-white">
+                                <div class="pb-4 border-b border-gray-700">
+                                    <p class="text-gray-400 text-xs uppercase tracking-wider mb-1">Flujo Neto de Caja</p>
+                                    <p :class="['text-2xl font-bold', (stats.intereses + stats.capital_recuperado - stats.prestamos - stats.gastos) >= 0 ? 'text-emerald-400' : 'text-red-400']">
                                         {{ formatCurrency(stats.intereses + stats.capital_recuperado - stats.prestamos - stats.gastos) }}
-                                    </h3>
-                                    <p class="text-gray-500 text-xs mt-1">Entradas vs Salidas</p>
+                                    </p>
+                                    <p class="text-gray-500 text-xs mt-0.5">Entradas vs Salidas totales</p>
+                                </div>
+                                <div class="pb-4 border-b border-gray-700">
+                                    <p class="text-gray-400 text-xs uppercase tracking-wider mb-1">Margen Operativo</p>
+                                    <p class="text-2xl font-bold text-yellow-400">
+                                        {{ stats.intereses > 0 ? (((stats.intereses - stats.gastos) / stats.intereses) * 100).toFixed(1) + '%' : 'N/A' }}
+                                    </p>
+                                    <p class="text-gray-500 text-xs mt-0.5">Utilidad / Intereses cobrados</p>
+                                </div>
+                                <div>
+                                    <p class="text-gray-400 text-xs uppercase tracking-wider mb-1">Eficiencia de Cobranza</p>
+                                    <div class="flex items-center gap-2">
+                                        <p :class="['text-2xl font-bold', salud?.eficiencia_cobranza >= 80 ? 'text-emerald-400' : salud?.eficiencia_cobranza >= 50 ? 'text-yellow-400' : 'text-red-400']">
+                                            {{ salud?.eficiencia_cobranza ?? 0 }}%
+                                        </p>
+                                        <span :class="['text-xs font-bold px-2 py-0.5 rounded-full', salud?.eficiencia_cobranza >= 80 ? 'bg-emerald-500/20 text-emerald-400' : salud?.eficiencia_cobranza >= 50 ? 'bg-yellow-500/20 text-yellow-400' : 'bg-red-500/20 text-red-400']">
+                                            {{ salud?.eficiencia_cobranza >= 80 ? 'Óptimo' : salud?.eficiencia_cobranza >= 50 ? 'Regular' : 'Crítico' }}
+                                        </span>
+                                    </div>
+                                    <p class="text-gray-500 text-xs mt-0.5">Cobrado vs Proyectado ({{ formatCurrency(salud?.interes_proyectado ?? 0) }})</p>
                                 </div>
                             </div>
                         </div>
 
                         <!-- Estado de Cartera -->
-                        <div class="bg-white dark:bg-[#1a1a1a] p-8 rounded-2xl shadow-xl border border-gray-100 dark:border-gray-800">
-                            <h3 class="text-xl font-bold mb-6 flex items-center gap-2 text-gray-800 dark:text-white">
-                                <GlobeAltIcon class="w-6 h-6 text-blue-500" />
-                                Estado de Cartera (Actual)
+                        <div class="bg-white dark:bg-[#1a1a1a] p-6 rounded-2xl shadow-xl border border-gray-100 dark:border-gray-800">
+                            <h3 class="text-sm font-bold mb-5 flex items-center gap-2 text-gray-800 dark:text-white uppercase tracking-widest">
+                                <GlobeAltIcon class="w-4 h-4 text-blue-500" /> Estado de Cartera
                             </h3>
-                            <div class="space-y-6">
+                            <div class="space-y-4">
                                 <div>
-                                    <div class="flex justify-between items-end mb-1">
-                                        <p class="text-gray-500 dark:text-gray-400 text-sm font-bold uppercase">Dinero en Calle (Total)</p>
-                                        <span class="text-2xl font-black text-gray-900 dark:text-white">{{ formatCurrency(stats.cartera_total) }}</span>
+                                    <div class="flex justify-between items-end mb-1.5">
+                                        <p class="text-gray-500 dark:text-gray-400 text-xs font-bold uppercase">Total en Calle</p>
+                                        <span class="text-xl font-black text-gray-900 dark:text-white">{{ formatCurrency(stats.cartera_total) }}</span>
                                     </div>
-                                    <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                                    <div class="w-full bg-gray-100 dark:bg-gray-800 rounded-full h-2">
                                         <div class="bg-blue-500 h-2 rounded-full" style="width: 100%"></div>
                                     </div>
+                                    <p class="text-xs text-gray-400 mt-1">Capital activo total</p>
                                 </div>
-
                                 <div>
-                                    <div class="flex justify-between items-end mb-1">
-                                        <p class="text-emerald-600 dark:text-emerald-400 text-sm font-bold uppercase">Cartera Vigente (Recuperable)</p>
-                                        <span class="text-xl font-bold text-emerald-600 dark:text-emerald-400">{{ formatCurrency(stats.cartera_vigente) }}</span>
+                                    <div class="flex justify-between items-end mb-1.5">
+                                        <p class="text-emerald-600 dark:text-emerald-400 text-xs font-bold uppercase">Vigente (Recuperable)</p>
+                                        <span class="text-lg font-black text-emerald-600 dark:text-emerald-400">{{ formatCurrency(stats.cartera_vigente) }}</span>
                                     </div>
-                                    <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                                    <div class="w-full bg-gray-100 dark:bg-gray-800 rounded-full h-2">
                                         <div class="bg-emerald-500 h-2 rounded-full" :style="`width: ${(stats.cartera_vigente / (stats.cartera_total || 1)) * 100}%`"></div>
                                     </div>
-                                    <p class="text-xs text-gray-400 mt-1">Préstamos activos < 3 meses sin mov.</p>
-                                </div>
-
-                                <div>
-                                    <div class="flex justify-between items-end mb-1">
-                                        <p class="text-red-600 dark:text-red-400 text-sm font-bold uppercase">En Riesgo / Remate</p>
-                                        <span class="text-xl font-bold text-red-600 dark:text-red-400">{{ formatCurrency(stats.cartera_remate) }}</span>
+                                    <div class="flex justify-between text-xs text-gray-400 mt-1">
+                                        <span>&lt; 3 meses sin movimiento</span>
+                                        <span class="font-bold">{{ ((stats.cartera_vigente / (stats.cartera_total || 1)) * 100).toFixed(1) }}%</span>
                                     </div>
-                                    <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                                </div>
+                                <div>
+                                    <div class="flex justify-between items-end mb-1.5">
+                                        <p class="text-red-600 dark:text-red-400 text-xs font-bold uppercase">En Riesgo / Remate</p>
+                                        <span class="text-lg font-black text-red-600 dark:text-red-400">{{ formatCurrency(stats.cartera_remate) }}</span>
+                                    </div>
+                                    <div class="w-full bg-gray-100 dark:bg-gray-800 rounded-full h-2">
                                         <div class="bg-red-500 h-2 rounded-full" :style="`width: ${(stats.cartera_remate / (stats.cartera_total || 1)) * 100}%`"></div>
                                     </div>
-                                    <p class="text-xs text-gray-400 mt-1">Préstamos > 3 meses sin mov.</p>
+                                    <div class="flex justify-between text-xs text-gray-400 mt-1">
+                                        <span>≥ 3 meses sin movimiento</span>
+                                        <span class="font-bold text-red-500">{{ ((stats.cartera_remate / (stats.cartera_total || 1)) * 100).toFixed(1) }}%</span>
+                                    </div>
+                                </div>
+                                <!-- Interés proyectado -->
+                                <div class="pt-3 border-t border-gray-100 dark:border-gray-800">
+                                    <div class="flex justify-between items-center">
+                                        <p class="text-xs text-gray-500 dark:text-gray-400 font-bold uppercase">Interés Esperado (10%)</p>
+                                        <span class="text-base font-black text-purple-600 dark:text-purple-400">{{ formatCurrency(salud?.interes_proyectado ?? 0) }}</span>
+                                    </div>
+                                    <p class="text-xs text-gray-400 mt-0.5">Si todos pagan este mes</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Panel de Alertas rápido -->
+                        <div class="bg-white dark:bg-[#1a1a1a] p-6 rounded-2xl shadow-xl border border-gray-100 dark:border-gray-800">
+                            <h3 class="text-sm font-bold mb-5 flex items-center gap-2 text-gray-800 dark:text-white uppercase tracking-widest">
+                                <ExclamationTriangleIcon class="w-4 h-4 text-orange-500" /> Semáforo de Cartera
+                            </h3>
+                            <div class="space-y-3">
+                                <div v-for="item in [
+                                    { key: 'al_dia', label: 'Al Día', emoji: '🟢', textColor: 'text-emerald-600 dark:text-emerald-400' },
+                                    { key: 'riesgo_leve', label: 'Riesgo Leve (31-60d)', emoji: '🟡', textColor: 'text-yellow-600 dark:text-yellow-400' },
+                                    { key: 'riesgo_alto', label: 'Riesgo Alto (61-89d)', emoji: '🟠', textColor: 'text-orange-600 dark:text-orange-400' },
+                                    { key: 'remate', label: 'En Remate (≥90d)', emoji: '🔴', textColor: 'text-red-600 dark:text-red-400' },
+                                ]" :key="item.key" class="flex items-center justify-between p-3 rounded-xl bg-gray-50 dark:bg-gray-900/40">
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-base">{{ item.emoji }}</span>
+                                        <span class="text-xs font-bold text-gray-700 dark:text-gray-300">{{ item.label }}</span>
+                                    </div>
+                                    <div class="text-right">
+                                        <p :class="['font-black text-sm', item.textColor]">{{ formatCurrency(salud?.aging?.[item.key]?.monto ?? 0) }}</p>
+                                        <p class="text-xs text-gray-400">{{ salud?.aging?.[item.key]?.count ?? 0 }} préstamo(s)</p>
+                                    </div>
+                                </div>
+                                <!-- Alertas activas -->
+                                <div class="pt-3 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between">
+                                    <p class="text-xs text-gray-500 font-bold uppercase">Alertas activas</p>
+                                    <button @click="activeTab = 'salud'" :class="['px-3 py-1 rounded-full text-xs font-bold transition-colors', (salud?.alertas?.length ?? 0) > 0 ? 'bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-300 hover:bg-orange-200' : 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300']">
+                                        {{ (salud?.alertas?.length ?? 0) > 0 ? `⚠️ ${salud.alertas.length} alertas → Ver` : '✅ Sin alertas' }}
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -322,73 +410,30 @@ const tabs = [
                     <DetallePagos :items="listas.capital" type="capital" :filters="{ modo: selectedModo, year: selectedYear, month: selectedMonth, week: selectedWeek }" />
                 </div>
 
+                <!-- Tab Content: SALUD -->
+                <div v-else-if="activeTab === 'salud'" class="fade-in space-y-6">
+                    <!-- Fila superior: Eficiencia + Aging -->
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <EficienciaCobranza
+                            :proyectado="salud?.interes_proyectado ?? 0"
+                            :cobrado="stats?.intereses ?? 0"
+                            :eficiencia="salud?.eficiencia_cobranza ?? 0"
+                        />
+                        <AgingCartera
+                            :aging="salud?.aging ?? {}"
+                            :carteraTotal="stats?.cartera_total ?? 0"
+                        />
+                    </div>
+                    <!-- Alertas tempranas a ancho completo -->
+                    <AlertasTemprana :alertas="salud?.alertas ?? []" />
+                </div>
+
                 <!-- Tab Content: REMATE -->
                 <div v-else-if="activeTab === 'remate'" class="fade-in">
-                     <div class="bg-white dark:bg-[#1a1a1a] rounded-2xl shadow-xl border border-gray-100 dark:border-gray-800 overflow-hidden">
-                        <div class="p-6 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center">
-                            <div>
-                                <h3 class="text-lg font-bold text-gray-800 dark:text-white flex items-center">
-                                    <ExclamationTriangleIcon class="w-5 h-5 mr-2 text-red-500" />
-                                    Préstamos en Remate
-                                </h3>
-                                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Artículos sin movimiento > 3 meses</p>
-                            </div>
-                            <button 
-                                @click="downloadRematePdf"
-                                class="inline-flex items-center px-4 py-2 bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded-lg text-sm font-bold hover:bg-red-100 dark:hover:bg-red-900/50 transition-colors"
-                            >
-                                <PrinterIcon class="w-4 h-4 mr-2" />
-                                Imprimir Remates
-                            </button>
-                        </div>
-                        <div class="overflow-x-auto">
-                            <table class="w-full text-left">
-                                <thead class="bg-gray-50 dark:bg-gray-900/50 text-xs uppercase text-gray-500 dark:text-gray-400 font-bold">
-                                    <tr>
-                                        <th class="px-6 py-4">#</th>
-                                        <th class="px-6 py-4">Código</th>
-                                        <th class="px-6 py-4">Cliente</th>
-                                        <th class="px-6 py-4">Artículo</th>
-                                        <th class="px-6 py-4">Capital</th>
-                                        <th class="px-6 py-4">Fecha Inicio</th>
-                                        <th class="px-6 py-4">Estado</th>
-                                        <th class="px-6 py-4"></th>
-                                    </tr>
-                                </thead>
-                                <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
-                                    <tr v-for="(p, index) in prestamosRemate" :key="p.id" class="hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors">
-                                        <td class="px-6 py-4 text-sm text-gray-400 font-mono">{{ index + 1 }}</td>
-                                        <td class="px-6 py-4 font-bold text-indigo-600 dark:text-indigo-400">{{ p.codigo }}</td>
-                                        <td class="px-6 py-4 text-gray-800 dark:text-gray-200">{{ p.cliente.nombre }}</td>
-                                        <td class="px-6 py-4 text-gray-700 dark:text-gray-300 text-sm max-w-xs truncate">
-                                            {{ p.articulos?.map(a => a.nombre).join(', ') || 'Sin artículo' }}
-                                        </td>
-                                        <td class="px-6 py-4 font-semibold text-gray-900 dark:text-white">{{ formatCurrency(p.saldo_a_fecha || p.monto) }}</td>
-                                        <td class="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">{{ dayjs(p.fecha_prestamo).utc().format('DD/MM/YYYY') }}</td>
-                                        <td class="px-6 py-4">
-                                            <span class="px-2.5 py-1 bg-red-50 dark:bg-red-500/20 text-red-600 dark:text-red-400 text-xs font-bold uppercase rounded-full">Remate</span>
-                                        </td>
-                                        <td class="px-6 py-4 text-right">
-                                            <Link :href="route('prestamos.edit', p.id)" class="text-indigo-600 dark:text-indigo-400 hover:text-indigo-900 dark:hover:text-indigo-300 text-sm font-medium hover:underline">
-                                                Ver →
-                                            </Link>
-                                        </td>
-                                    </tr>
-                                    <tr v-if="prestamosRemate.length === 0">
-                                        <td colspan="8" class="px-6 py-16 text-center">
-                                            <div class="flex flex-col items-center">
-                                                <div class="w-16 h-16 bg-green-100 dark:bg-green-500/20 rounded-full flex items-center justify-center mb-4">
-                                                    <svg class="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                                                </div>
-                                                <p class="text-gray-500 dark:text-gray-400 font-medium">¡Excelente! No hay préstamos en situación de remate.</p>
-                                                <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">Todos los clientes están al día con sus pagos.</p>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
+                    <DetalleRemate
+                        :items="prestamosRemate"
+                        :filters="{ modo: selectedModo, year: selectedYear, month: selectedMonth, week: selectedWeek }"
+                    />
                 </div>
 
             </div>

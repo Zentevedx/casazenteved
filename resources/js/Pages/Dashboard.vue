@@ -5,7 +5,10 @@ import { ref, computed } from 'vue';
 import KpiCard from '@/Components/Estadisticas/KpiCard.vue';
 import MonthGroup from '@/Components/Dashboard/MonthGroup.vue';
 import ChartComponent from '@/Components/Dashboard/ChartComponent.vue';
-import { FunnelIcon, PlusIcon, UserPlusIcon, ExclamationTriangleIcon, ClockIcon } from '@heroicons/vue/24/solid';
+import TableroCobranza from '@/Components/Vencimientos/TableroCobranza.vue';
+import { FunnelIcon, PlusIcon, UserPlusIcon, ExclamationTriangleIcon, ClockIcon, CalendarDaysIcon } from '@heroicons/vue/24/solid';
+
+const mostrarTableroCobranza = ref(false);
 
 const props = defineProps({
     reporteAgrupado: Array,
@@ -157,6 +160,23 @@ const chartData = computed(() => {
                             </Link>
                         </div>
 
+                        <!-- Botón Cobros Próximos -->
+                        <button
+                            @click="mostrarTableroCobranza = true"
+                            class="group relative overflow-hidden w-full bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 p-4 rounded-2xl transition-all shadow-lg hover:shadow-amber-500/25 flex items-center gap-3 border border-white/10"
+                        >
+                            <div class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
+                                <CalendarDaysIcon class="w-6 h-6 text-white" />
+                            </div>
+                            <div class="text-left">
+                                <span class="text-sm font-bold text-white block">Cobros Próximos</span>
+                                <span class="text-[10px] text-white/70">Hoy + 4 semanas de vista</span>
+                            </div>
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-white/60 ml-auto group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                            </svg>
+                        </button>
+
                       <!-- Chart Widget -->
                         <div class="bg-white dark:bg-[#1a1a1a] p-6 rounded-[24px] shadow-sm dark:shadow-lg border border-gray-200 dark:border-gray-800 min-h-[350px] flex flex-col">
                             <h4 class="text-xs font-bold text-gray-500 mb-6 uppercase tracking-widest flex items-center gap-2">
@@ -198,5 +218,11 @@ const chartData = computed(() => {
                 </div>
             </div>
         </div>
+
+        <!-- Overlay: Tablero de Cobranza -->
+        <TableroCobranza
+            v-if="mostrarTableroCobranza"
+            @close="mostrarTableroCobranza = false"
+        />
     </AuthenticatedLayout>
 </template>

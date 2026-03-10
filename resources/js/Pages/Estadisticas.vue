@@ -11,6 +11,7 @@ import KpiCard from '@/Components/Estadisticas/KpiCard.vue'
 import RankingList from '@/Components/Estadisticas/RankingList.vue'
 import ModernFilter from '@/Components/Estadisticas/ModernFilter.vue'
 import TablaCaja from '@/Components/Estadisticas/TablaCaja.vue'
+import ProyeccionIngresos from '@/Components/Estadisticas/ProyeccionIngresos.vue'
 import { TrophyIcon, ExclamationTriangleIcon } from '@heroicons/vue/24/solid';
 
 dayjs.locale('es')
@@ -20,7 +21,8 @@ const props = defineProps({
   ranking: Object,
   graficos: Object,
   reporteCaja: Object,
-  filtros: Object
+  filtros: Object,
+  proyeccion: Object,
 })
 
 const selectedModo = ref(props.filtros.modo)
@@ -187,8 +189,8 @@ const totalInventario = computed(() => props.graficos.estado_inventario.reduce((
             <!-- Dashboard Content -->
             <div class="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
                 
-                <!-- 1. KPI Grid (Top Row) - Expanded to 5 cols for better density -->
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5">
+                <!-- 1. KPI Grid (Top Row) -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-5">
                     <KpiCard title="Capital Colocado" :value="formatCurrency(kpis.colocado.valor)" :trend="kpis.colocado.variacion" colorTheme="indigo" />
                     <KpiCard title="Ganancia Neta" :value="formatCurrency(kpis.ingresos.valor)" :trend="kpis.ingresos.variacion" colorTheme="emerald" />
                     <KpiCard title="Valor en Custodia" :value="formatCurrency(kpis.inventario.valor_total)" :subValue="`${kpis.inventario.items} artículos`" colorTheme="amber" />
@@ -202,9 +204,17 @@ const totalInventario = computed(() => props.graficos.estado_inventario.reduce((
                              <p class="text-xs text-gray-500 mt-1">Operaciones totales</p>
                         </div>
                         <div class="w-full bg-gray-800 h-1.5 rounded-full mt-4 overflow-hidden">
-                             <div class="bg-blue-500 h-full rounded-full" style="width: 75%"></div> <!-- Dummy percentage for visual -->
+                             <div class="bg-blue-500 h-full rounded-full" style="width: 75%"></div>
                         </div>
                     </div>
+
+                    <!-- Widget ProyeccionIngresos -->
+                    <ProyeccionIngresos
+                        v-if="proyeccion"
+                        :proyectado="proyeccion.interes_proyectado ?? 0"
+                        :cobrado="proyeccion.cobrado ?? 0"
+                        :eficiencia="proyeccion.eficiencia ?? 0"
+                    />
                 </div>
 
                 <!-- 2. Mid Section: Trend Charts & Distributions -->

@@ -15,6 +15,7 @@ class Pago extends Model
         'tipo_pago',
         'monto_pagado',
         'fecha_pago',
+        'codigo_comprobante',
     ];
 
     public function prestamo()

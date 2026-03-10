@@ -4,9 +4,12 @@ import { useForm, Link } from '@inertiajs/vue3'
 import Layout from '@/Layouts/AuthenticatedLayout.vue'
 import { PlusIcon, TrashIcon, ArrowLeftIcon, PhotoIcon, DocumentTextIcon } from '@heroicons/vue/24/outline'
 
+import { compressImage } from '@/Utils/imageCompressor'
+
 const props = defineProps({ clientes: Array })
 
 const clientesFiltrados = ref([])
+const isCompressing = ref(false)
 
 const form = useForm({
   codigo: '',
@@ -48,15 +51,30 @@ function removeArticulo (index) {
   }
 }
 
-function handleFileChange (e, index) {
+async function handleFileChange (e, index) {
   const file = e.target.files[0]
   if (file) {
-    form.articulos[index].foto_url = file
+    // Show preview immediately with original file
     form.articulos[index].vista_previa = URL.createObjectURL(file)
+    
+    // Compress
+    isCompressing.value = true
+    try {
+        const compressedFile = await compressImage(file)
+        form.articulos[index].foto_url = compressedFile
+        console.log(`Original: ${(file.size/1024).toFixed(2)}KB, Compressed: ${(compressedFile.size/1024).toFixed(2)}KB`)
+    } catch (error) {
+        console.error('Compression failed:', error)
+        // Fallback to original if compression fails
+        form.articulos[index].foto_url = file
+    } finally {
+        isCompressing.value = false
+    }
   }
 }
 
 function submit () {
+  if (isCompressing.value) return; // Prevent submit while compressing
   form.post('/prestamos', { forceFormData: true })
 }
 </script>
@@ -182,12 +200,19 @@ function submit () {
                                 <!-- Image Upload -->
                                 <div class="shrink-0">
                                     <div class="w-32 h-32 rounded-xl bg-gray-100 dark:bg-black border-2 border-dashed border-gray-300 dark:border-gray-700 flex items-center justify-center overflow-hidden relative cursor-pointer hover:border-indigo-500 transition-colors group-image">
+                                        <div v-if="isCompressing" class="absolute inset-0 z-20 bg-black/50 flex flex-col items-center justify-center text-white p-2 text-center animate-pulse">
+                                            <svg class="w-6 h-6 mb-1 animate-spin" fill="none" viewBox="0 0 24 24">
+                                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                            </svg>
+                                            <span class="text-[9px] font-bold uppercase">Optimizando...</span>
+                                        </div>
                                         <img v-if="articulo.vista_previa" :src="articulo.vista_previa" class="w-full h-full object-cover" />
                                         <div v-else class="text-center p-2">
                                             <PhotoIcon class="w-8 h-8 text-gray-400 dark:text-gray-600 mx-auto mb-1" />
                                             <span class="text-[10px] text-gray-500">Subir foto</span>
                                         </div>
-                                        <input type="file" @change="e => handleFileChange(e, index)" class="absolute inset-0 opacity-0 cursor-pointer" accept="image/*" />
+                                        <input type="file" @change="e => handleFileChange(e, index)" class="absolute inset-0 opacity-0 cursor-pointer" accept="image/*" capture="environment" />
                                     </div>
                                 </div>
 

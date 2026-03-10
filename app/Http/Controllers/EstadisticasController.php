@@ -136,6 +136,19 @@ class EstadisticasController extends Controller
             $flujoNeto->push($entrada - $salida);
         }
 
+        // --- PROYECCIÓN DE INGRESOS (para widget ProyeccionIngresos) ---
+        // Cartera vigente = préstamos activos sin capital pagado (saldo real)
+        $carteraVigente = Prestamo::where('estado', 'Activo')
+            ->withSum(['pagos as capital_pagado' => fn($q) => $q->where('tipo_pago', 'Capital')], 'monto_pagado')
+            ->get()
+            ->sum(fn($p) => max(0, $p->monto - ($p->capital_pagado ?? 0)));
+
+        $interesProyectado = round($carteraVigente * 0.10, 2);
+        $cobradoReal       = $ingresosActual;
+        $eficiencia        = $interesProyectado > 0
+            ? round(($cobradoReal / $interesProyectado) * 100, 1)
+            : 0;
+
         return Inertia::render('Estadisticas', [
             'kpis' => $kpis,
             'ranking' => [
@@ -148,7 +161,12 @@ class EstadisticasController extends Controller
                 'distribucion_cartera' => $distribucionCartera,
                 'estado_inventario' => $estadoInventario,
             ],
-            'reporteCaja' => $this->generarReporteDetallado($from, $to), // (Tu función original)
+            'reporteCaja' => $this->generarReporteDetallado($from, $to),
+            'proyeccion' => [
+                'interes_proyectado' => $interesProyectado,
+                'cobrado'            => $cobradoReal,
+                'eficiencia'         => $eficiencia,
+            ],
             'filtros' => [
                 'modo' => $modo,
                 'fecha' => $fecha,
