@@ -8,7 +8,7 @@ use App\Models\Caja; // <--- IMPORTANTE: Modelo Caja importado
 use App\Models\Cliente;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Barryvdh\DomPDF\Facade\Pdf;
+use Spatie\Browsershot\Browsershot;
 use Inertia\Inertia;
 use Illuminate\Support\Str;
 
@@ -175,9 +175,19 @@ class PrestamoController extends Controller
     public function generarPdf(Prestamo $prestamo)
     {
         $prestamo->load('cliente', 'articulos');
-        $pdf = Pdf::loadView('pdf.boleta-prestamo', compact('prestamo'));
+        $html = view('pdf.boleta-prestamo', compact('prestamo'))->render();
 
-        return $pdf->stream('boleta-' . $prestamo->codigo . '.pdf');
+        $base64 = Browsershot::html($html)
+            ->showBackground()
+            ->format('Letter')
+            ->margins(0, 0, 0, 0)
+            ->noSandbox()
+            ->setChromePath('/usr/bin/chromium')
+            ->base64pdf();
+
+        return response(base64_decode($base64))
+            ->header('Content-Type', 'application/pdf')
+            ->header('Content-Disposition', 'inline; filename="boleta-' . $prestamo->codigo . '.pdf"');
     }
 
     public function updateEstado(Request $request, Prestamo $prestamo)

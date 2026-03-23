@@ -3,285 +3,347 @@
 <head>
     <meta charset="UTF-8">
     <title>Boleta #{{ $prestamo->codigo }}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
+        @font-face {
+            font-family: 'UFCSans';
+            src: url('data:font/truetype;charset=utf-8;base64,{{ base64_encode(file_get_contents(public_path('Fuentes/UFCSans-Bold.ttf'))) }}') format('truetype');
+            font-weight: bold;
+            font-style: normal;
+        }
+        @font-face {
+            font-family: 'UFCSans';
+            src: url('data:font/truetype;charset=utf-8;base64,{{ base64_encode(file_get_contents(public_path('Fuentes/UFCSans-Regular.ttf'))) }}') format('truetype');
+            font-weight: normal;
+            font-style: normal;
+        }
+
+        :root {
+            --dark: #0f172a;
+            --gray: #475569;
+            --light-gray: #f8fafc;
+            --border: #cbd5e1;
+            --accent: #014959ff; /* Deep Orange for highlights */
+            --light-accent: #fff7ed; /* Very faint orange background */
+            --danger: #dc2626; /* Red for Multa */
+        }
+
         @page {
             size: letter;
             margin: 0;
         }
+
         body {
-            font-family: 'Helvetica', 'Arial', sans-serif;
+            font-family: 'Inter', sans-serif;
             margin: 0;
-            padding: 20px;
-            color: #333;
+            padding: 10px 20px; 
+            color: var(--dark);
+            background: #ffffff;
+            font-size: 8px; 
+            line-height: 1.2;
+            -webkit-print-color-adjust: exact;
+        }
+
+        .receipt-container {
+            width: 100%;
+            /* Auto height allows the container to snap tightly, removing extra signature space! */
+            height: auto; 
+            max-height: 48vh; 
+            box-sizing: border-box;
             background: #fff;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden; 
         }
-        .container {
-            width: 100%;
-            height: 48vh; /* Mitad de carta aprox */
-            border-bottom: 2px dashed #ccc;
-            padding-bottom: 20px;
-            margin-bottom: 20px;
-            position: relative;
+
+        .ufc-font {
+            font-family: 'UFCSans', sans-serif !important;
+            letter-spacing: 0.5px;
         }
+
+        .highlight-orange {
+            color: var(--accent);
+            font-weight: bold;
+        }
+
+        .highlight-red {
+            color: var(--danger);
+            font-weight: bold;
+        }
+
+        /* Header */
         .header {
-            display: table;
-            width: 100%;
-            border-bottom: 2px solid #000;
-            padding-bottom: 10px;
-            margin-bottom: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            border-bottom: 2px solid var(--dark);
+            padding-bottom: 6px;
+            margin-bottom: 8px;
+            flex-shrink: 0;
         }
-        .logo-section {
-            display: table-cell;
-            width: 20%;
-            vertical-align: middle;
+
+        .header-left {
+            display: flex;
+            gap: 12px;
+            align-items: center;
         }
-        .logo {
-            width: 80px;
-            height: auto;
+
+        .logo-img {
+            height: 50px; 
         }
-        .company-info {
-            display: table-cell;
-            width: 50%;
-            vertical-align: middle;
-            font-size: 10px;
-            line-height: 1.4;
-        }
+
         .company-name {
-            font-size: 16px;
-            font-weight: bold;
+            font-size: 14px;
+            font-weight: 800;
             text-transform: uppercase;
+            margin: 0 0 2px 0;
         }
-        .ticket-info {
-            display: table-cell;
-            width: 30%;
+
+        .company-details {
+            font-size: 9px;
+            color: var(--gray);
+            line-height: 1.3;
+        }
+
+        .ticket-badge {
             text-align: right;
-            vertical-align: top;
         }
-        .ticket-number {
-            font-size: 24px;
-            font-weight: bold;
-            color: #057894ff;
-        }
-        .ticket-label {
-            font-size: 10px;
-            font-weight: bold;
+
+        .ticket-badge-label {
+            font-size: 9px;
+            color: var(--gray);
+            font-weight: 700;
             text-transform: uppercase;
-            color: #555;
+        }
+
+        .ticket-number {
+            font-size: 30px;
+            line-height: 1;
+        }
+
+        /* Lean columns for data */
+        .main-columns {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 6px;
+            flex-shrink: 0;
+        }
+
+        .col {
+            flex: 1;
         }
 
         .section-title {
-            font-size: 11px;
-            font-weight: bold;
+            font-size: 10px;
+            font-weight: 800;
             text-transform: uppercase;
-            background: #f0f0f0;
-            padding: 2px 2px;
-            margin-bottom: 2px;
-            border-left: 4px solid #333;
-        }
-
-        .grid {
-            display: table;
-            width: 100%;
-            margin-bottom: 2px;
-        }
-        .col {
-            display: table-cell;
-            padding-right: 10px;
-        }
-        .field {
+            background: var(--light-gray);
+            padding: 3px 6px;
             margin-bottom: 4px;
-        }
-        .label {
-            font-size: 9px;
-            color: #666;
-            text-transform: uppercase;
-        }
-        .value {
-            font-size: 11px;
-            font-weight: bold;
+            border-left: 2px solid var(--dark);
         }
 
-        table {
+        .data-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            margin-bottom: 3px;
+            border-bottom: 1px dotted var(--border);
+            padding-bottom: 2px;
+        }
+
+        .data-label {
+            color: var(--gray);
+            font-weight: 600;
+            font-size: 9px;
+        }
+
+        .data-value {
+            font-weight: 700;
+            font-size: 9px;
+            text-align: right;
+        }
+
+        /* Minimal Table */
+        .items-table {
             width: 100%;
             border-collapse: collapse;
-            margin-bottom: 10px;
-            font-size: 10px;
+            font-size: 9px;
+            margin-bottom: 6px;
+            flex-shrink: 1; 
         }
-        th {
-            background: #f0f0f0;
+
+        .items-table th {
+            background: var(--light-gray);
+            font-weight: 700;
+            text-transform: uppercase;
+            padding: 3px 5px;
             text-align: left;
-            padding: 4px 8px;
-            border-bottom: 1px solid #ddd;
-        }
-        td {
-            padding: 4px 8px;
-            border-bottom: 1px solid #eee;
+            border-top: 1px solid var(--dark);
+            border-bottom: 1px solid var(--dark);
         }
 
-        .terms {
+        .items-table td {
+            padding: 3px 5px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .item-name {
+            font-weight: 700;
+        }
+
+        /* Compact Terms block */
+        .terms-text {
             font-size: 8px;
+            color: var(--gray);
             text-align: justify;
-            color: #000000ff;
-            margin-top: 10px;
-            line-height: 1.2;
-            border: 1px solid #eee;
-            padding: 8px;
+            line-height: 1.3;
+            border-left: 2px solid var(--gray);
+            padding-left: 8px;
+            margin-bottom: 12px;
+            margin-top: 12px;
         }
 
-        .signatures {
-            margin-top: 30px;
-            display: table;
-            width: 100%;
+        /* Signatures snap tightly above footer */
+        .signatures-grid {
+            display: flex;
+            justify-content: space-between;
+            flex-shrink: 0;
+            padding: 0 10px;
+            margin-top: 30px; /* Reduces huge empty space by snapping */
         }
-        .sig-box {
-            display: table-cell;
-            width: 45%;
+
+        .signature-box {
+            width: 35%;
             text-align: center;
         }
-        .sig-line {
-            border-top: 1px solid #000;
-            width: 80%;
-            margin: 0 auto;
-            padding-top: 4px;
-            font-size: 10px;
-            font-weight: bold;
-        }
 
-        .totals {
-            text-align: right;
-            font-size: 12px;
-            margin-top: 10px;
-        }
-        .total-row {
+        .signature-line {
+            height: 1px;
+            background: var(--dark);
             margin-bottom: 2px;
         }
-        .total-big {
-            font-size: 14px;
-            font-weight: bold;
-            color: #000;
-        }
 
-        .watermark {
-            position: absolute;
-            top: 30%;
-            left: 50%;
-            transform: translate(-50%, -50%) rotate(-45deg);
-            font-size: 80px;
-            color: rgba(0,0,0,0.03);
-            font-weight: bold;
-            z-index: -1;
-            pointer-events: none;
+        .signature-name {
+            font-size: 9px;
+            font-weight: 800;
+            color: var(--dark);
+            text-transform: uppercase;
         }
+        
     </style>
 </head>
 <body>
 
-    <div class="container">
-        <div class="watermark">ORIGINAL</div>
+    <div class="receipt-container">
         
+        <!-- Header -->
         <div class="header">
-            <div class="logo-section">
-                <!-- Ajusta la ruta del logo si es necesario o úsala base64 -->
+            <div class="header-left">
                 @if(file_exists(public_path('LOGO2026-01.jpg')))
-                    <img src="{{ public_path('LOGO2026-01.jpg') }}" class="logo">
+                    <img src="data:image/jpeg;base64,{{ base64_encode(file_get_contents(public_path('LOGO2026-01.jpg'))) }}" class="logo-img">
                 @else
-                    <div style="font-size:20px; font-weight:bold;">PRESTAMAX</div>
+                    <div style="font-size: 20px; font-weight: 800; line-height: 1;">PRESTAMAX</div>
                 @endif
-            </div>
-            <div class="company-info">
-                <div class="company-name">Casa de Empeños "ZENTEVEDLU"</div>
-                <div>Av. Panamericana / Av. V. de Loreto</div>
-                <div>Cochabamba - Bolivia</div>
-                <div><strong>Whatsapp:</strong> 60763882 | <strong>NIT:</strong> 8420256011</div>
-            </div>
-            <div class="ticket-info">
-                <div class="ticket-label">CÓDIGO DE PRÉSTAMO</div>
-                <div class="ticket-number">{{ $prestamo->codigo }}</div>
-                <div style="font-size: 9px; color: #666; margin-top: 4px;">COPIA CLIENTE</div>
-            </div>
-        </div>
-
-        <div class="grid">
-            <div class="col" style="width: 60%;">
-                <div class="section-title">DATOS DEL CLIENTE</div>
-                <div class="grid">
-                    <div class="col">
-                        <div class="field"><span class="label">NOMBRE:</span> <span class="value">{{ $prestamo->cliente->nombre }}</span></div>
-                        <div class="field"><span class="label">CI/NIT:</span> <span class="value">{{ $prestamo->cliente->ci }}</span></div>
+                <div>
+                    <h1 class="company-name">CASA DE EMPEÑOS "ZENTEVEDLU"</h1>
+                    <div class="company-details">
+                        Av. Panamericana / V. de Loreto | Cochabamba<br>
+                        <strong>NIT:</strong> 8420256011 | <strong>WA:</strong> 60763882
                     </div>
                 </div>
             </div>
-            <div class="col" style="width: 40%;">
-                <div class="section-title">DETALLES DEL PRÉSTAMO</div>
-                <table style="width: 100%; margin-top: 5px;">
-                    <tr>
-                        <td style="border: none; padding: 2px 0;">
-                            <div class="label">FECHA INICIO</div>
-                            <div class="value">{{ \Carbon\Carbon::parse($prestamo->fecha_prestamo)->format('d/m/Y') }}</div>
-                        </td>
-                        <td style="border: none; padding: 2px 0; text-align: right;">
-                            <div class="label">VENCIMIENTO</div>
-                            <div class="value" style="color: #944805ff;">{{ \Carbon\Carbon::parse($prestamo->fecha_prestamo)->addDays(30)->format('d/m/Y') }}</div>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td colspan="2" style="border: none; padding-top: 2px;">
-                            <div style="background: #f9f9f9; padding: 4px; border-radius: 4px; border: 1px solid #eee;">
-                                <span class="label">MULTA RETRASO:</span> 
-                                <span class="value" style="color: #c11306ff; margin-left: 5px;">{{ $prestamo->multa_por_retraso ?? '--' }}</span>
-                            </div>
-                        </td>
-                    </tr>
-                </table>
+            
+            <div class="ticket-badge">
+                <div class="ticket-badge-label">CÓDIGO PRÉSTAMO</div>
+                <div class="ticket-number highlight-orange ufc-font">{{ $prestamo->codigo }}</div>
             </div>
         </div>
 
-        <div class="section-title">ARTÍCULOS EN GARANTÍA PRENDARIA</div>
-        <table>
+        <!-- 2 Columns -->
+        <div class="main-columns">
+            <div class="col">
+                <div class="section-title">Datos del Titular</div>
+                <div class="data-row">
+                    <span class="data-label">Nombre Comercial:</span>
+                    <span class="data-value">{{ mb_strimwidth($prestamo->cliente->nombre, 0, 35, "...") }}</span>
+                </div>
+                <div class="data-row">
+                    <span class="data-label">Documento C.I.:</span>
+                    <span class="data-value">{{ $prestamo->cliente->ci }}</span>
+                </div>
+            </div>
+            
+            <div class="col">
+                <div class="section-title">Contrato y Capital</div>
+                
+                <!-- FECHAS JUNTAS -->
+                <div class="data-row">
+                    <span class="data-label">Emisión / Venc. (30D):</span>
+                    <span class="data-value">
+                        {{ \Carbon\Carbon::parse($prestamo->fecha_prestamo)->format('d/m/Y') }} &nbsp;|&nbsp; 
+                        <span style="font-weight: 800; color: var(--dark); text-decoration: underline;">
+                            {{ \Carbon\Carbon::parse($prestamo->fecha_prestamo)->addDays(30)->format('d/m/Y') }}
+                        </span>
+                    </span>
+                </div>
+                
+                <div class="data-row">
+                    <span class="data-label">Multa por Retraso:</span>
+                    <span class="data-value highlight-red ufc-font" style="font-size: 11px;">Bs {{ number_format($prestamo->multa_por_retraso ?? 0, 2) }}</span>
+                </div>
+                
+                <!-- CAPITAL PRESTADO JUNTO CON EL CONTRATO -->
+                <div class="data-row" style="border: 1px solid var(--accent); padding: 4px; margin-top: 4px; border-radius: 4px; border-bottom: 1px solid var(--accent);">
+                    <span class="data-label" style="color: var(--dark); font-weight: 800;">CAPITAL PRESTADO:</span>
+                    <span class="data-value highlight-orange ufc-font" style="font-size: 13px;">Bs {{ number_format($prestamo->monto, 2) }}</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="section-title" style="margin-bottom: 2px;">Garantía Prendaria (Física)</div>
+        <table class="items-table">
             <thead>
                 <tr>
-                    <th width="40">#</th>
-                    <th>ARTÍCULO</th>
-                    <th>DESCRIPCIÓN / OBSERVACIONES</th>
+                    <th width="8%">#</th>
+                    <th width="42%">Artículo Nominal</th>
+                    <th width="50%">Descripción / Observaciones Técnicas</th>
                 </tr>
             </thead>
             <tbody>
                 @foreach ($prestamo->articulos as $index => $item)
                 <tr>
-                    <td>{{ $index + 1 }}</td>
-                    <td><b>{{ $item->nombre_articulo }}</b></td>
-                    <td>{{ $item->descripcion }}</td>
+                    <td style="font-weight: 700; color: var(--dark);">{{ str_pad($index + 1, 2, '0', STR_PAD_LEFT) }}</td>
+                    <td><span class="item-name">{{ $item->nombre_articulo }}</span></td>
+                    <td style="color: var(--gray);">{{ mb_strimwidth($item->descripcion, 0, 75, "...") }}</td>
                 </tr>
                 @endforeach
+                @if($prestamo->articulos->count() == 0)
+                <tr><td colspan="3" style="text-align: center; color: var(--gray); font-style: italic;">Sin artículos registrados bajo este código.</td></tr>
+                @endif
             </tbody>
         </table>
 
-        <div class="totals">
-            <div class="total-row"><span class="label">CAPITAL PRESTADO:</span> <span class="total-big">Bs {{ number_format($prestamo->monto, 2) }}</span></div>
+        <!-- Bottom Layout: Terms -->
+        <div class="terms-text">
+            <strong>TÉRMINOS Y CONDICIONES: 1.</strong> El deudor declara recibir el capital detallado a su libre satisfacción. <strong>2.</strong> Plazo estricto de 30 días calendario. El vencimiento del mismo genera obligaciones de mora automáticamente. <strong>3.</strong> La falta absoluta de pago o renovación documentada de esta boleta tras 90 días faculta legal y ejecutivamente a la Casa de Empeños "ZENTEVEDLU" a enajenar, liquidar o rematar la garantía física para recuperación del capital emitido sin necesidad ni responsabilidad de notificaciones procesales adicionales. <strong>4.</strong> El cliente testifica civil y penalmente ser propietario legal de la prenda.
         </div>
 
-        <div class="terms">
-            <strong>TÉRMINOS Y CONDICIONES:</strong>
-            1. El deudor declara haber recibido el monto detallado a su entera satisfacción.
-            2. El plazo del contrato es de 30 días calendario. Vencido el plazo, se generará una mora automática.
-            3. La falta de pago o renovación por más de 90 días facultará a la Casa de Empeños a disponer del bien prendado para recuperar el capital, sin necesidad de notificación judicial.
-            4. El deudor garantiza ser el legítimo propietario de los bienes dejados en garantía.
-        </div>
-
-        <div class="signatures">
-            <div class="sig-box">
-                <div class="sig-line">FIRMA DEL CLIENTE</div>
-                <div style="font-size: 8px; margin-top: 2px;">{{ $prestamo->cliente->nombre }}</div>
+        <!-- Signatures directly below terms due to auto-height -->
+        <div class="signatures-grid">
+            <div class="signature-box">
+                <div class="signature-line"></div>
+                <div class="signature-name">{{ mb_strimwidth($prestamo->cliente->nombre, 0, 30, "...") }}</div>
+                <div style="font-size: 6px; color: var(--gray);">C.I. {{ $prestamo->cliente->ci }} - Firma del Prestatario / Titular</div>
             </div>
-            <div class="sig-box">
-                <!-- Espacio para sello opcional -->
-                <div class="sig-line">FIRMA AUTORIZADA</div>
-                <div style="font-size: 8px; margin-top: 2px;">CASA DE EMPEÑOS</div>
+            <div class="signature-box">
+                <div class="signature-line"></div>
+                <div class="signature-name">CASA DE EMPEÑOS "ZENTEVEDLU"</div>
+                <div style="font-size: 6px; color: var(--gray);">Sello y Firma Aprobada Administración</div>
             </div>
         </div>
+        
     </div>
-
-
 
 </body>
 </html>

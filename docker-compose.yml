@@ -1,0 +1,56 @@
+services:
+  app:
+    restart: unless-stopped
+    build: .
+    ports:
+      - "80:80"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./:/var/www/html
+      - vendor_data:/var/www/html/vendor
+      - node_modules_data:/var/www/html/node_modules
+    networks:
+      - casazenteved_net
+
+  db:
+    restart: unless-stopped
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: secret
+      MYSQL_DATABASE: pawnhome
+    volumes:
+      - ./DumpDocker23032026.sql:/docker-entrypoint-initdb.d/init.sql
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - casazenteved_net
+
+  ngrok:
+    restart: unless-stopped
+    image: ngrok/ngrok:latest
+    command:
+      - "http"
+      - "app:80"
+    environment:
+      NGROK_AUTHTOKEN: "37D8PNWotaoIbXlkRJzwPbxFDNC_6aHEutAHpzehx24uM25xA"
+    depends_on:
+      - app
+    ports:
+      - "4040:4040"
+    networks:
+      - casazenteved_net
+
+volumes:
+  mysql_data:
+  vendor_data:
+  node_modules_data:
+
+networks:
+  casazenteved_net:
+    driver: bridge

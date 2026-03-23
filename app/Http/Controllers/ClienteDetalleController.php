@@ -11,91 +11,50 @@ class ClienteDetalleController extends Controller
     {
         $cliente->load('prestamos.pagos', 'prestamos.articulos');
 
-        // Calcular el desempeño del cliente (Scoring)
-        $desempeno = $this->calcularDesempeno($cliente);
+        $resumenFinanciero = $this->calcularResumenFinanciero($cliente);
 
         return inertia('Clientes/Detalle', [
             'cliente' => $cliente,
             'prestamos' => $cliente->prestamos,
-            'desempeno' => $desempeno,
+            'resumenFinanciero' => $resumenFinanciero,
         ]);
     }
 
     /**
-     * Calcula una puntuación de 0 a 100 y métricas relevantes de desempeño
+     * Calcula totales financieros reales del cliente
      */
-    private function calcularDesempeno(Cliente $cliente): array
+    private function calcularResumenFinanciero(Cliente $cliente): array
     {
         $prestamos = $cliente->prestamos;
-        
-        if ($prestamos->isEmpty()) {
-            return [
-                'score' => 0,
-                'estrellas' => 0,
-                'etiqueta' => 'Nuevo Cliente',
-                'color' => 'gray',
-                'metricas' => [
-                    'total' => 0,
-                    'pagados' => 0,
-                    'con_multa' => 0,
-                ]
-            ];
-        }
 
-        $totalPrestamos = $prestamos->count();
-        $pagados = $prestamos->where('estado', 'Pagado')->count();
-        $conMulta = $prestamos->where('multa_por_retraso', '>', 0)->count();
-        $activosVencidos = $prestamos->whereIn('estado', ['Activo', 'Vencido']);
+        $totalPrestamos = $prestamos->sum('monto');
 
-        // Puntuación Base
-        $score = 50; // Empezamos en un nivel medio
+        $todosLosPagos = $prestamos->flatMap(fn($p) => $p->pagos);
 
-        // Bonificaciones (Experiencia y Cumplimiento)
-        $score += ($pagados * 10); // +10 puntos por cada préstamo finalizado exitosamente
-        if ($pagados > 0 && $conMulta === 0) {
-            $score += 10; // Bono de historial impoluto
-        }
+        $totalIntereses = $todosLosPagos
+            ->where('tipo_pago', 'Interes')
+            ->sum('monto_pagado');
 
-        // Penalizaciones
-        $score -= ($conMulta * 15); // -15 puntos por cada préstamo que tuvo multas
-        $score -= ($activosVencidos->where('estado', 'Vencido')->count() * 25); // -25 por préstamos actualmente vencidos
+        $totalPagosCapital = $todosLosPagos
+            ->where('tipo_pago', 'Capital')
+            ->sum('monto_pagado');
 
-        // Limitar entre 0 y 100
-        $score = max(0, min(100, $score));
+        // Deuda pendiente = monto de préstamos activos/vencidos - pagos de capital de esos préstamos
+        $prestamosActivos = $prestamos->whereIn('estado', ['Activo', 'Vencido']);
+        $montoActivos = $prestamosActivos->sum('monto');
+        $capitalPagadoActivos = $prestamosActivos
+            ->flatMap(fn($p) => $p->pagos)
+            ->where('tipo_pago', 'Capital')
+            ->sum('monto_pagado');
 
-        // Determinar Estrellas, Etiqueta y Color
-        if ($score >= 90) {
-            $estrellas = 5;
-            $etiqueta = 'Excelente';
-            $color = 'emerald';
-        } elseif ($score >= 70) {
-            $estrellas = 4;
-            $etiqueta = 'Buen Cliente';
-            $color = 'blue';
-        } elseif ($score >= 40) {
-            $estrellas = 3;
-            $etiqueta = 'Regular';
-            $color = 'yellow';
-        } elseif ($score >= 20) {
-            $estrellas = 2;
-            $etiqueta = 'Riesgo Medio';
-            $color = 'orange';
-        } else {
-            $estrellas = 1;
-            $etiqueta = 'Alto Riesgo';
-            $color = 'red';
-        }
+        $deudaPendiente = max(0, $montoActivos - $capitalPagadoActivos);
 
         return [
-            'score' => $score,
-            'estrellas' => $estrellas,
-            'etiqueta' => $etiqueta,
-            'color' => $color,
-            'metricas' => [
-                'total' => $totalPrestamos,
-                'pagados' => $pagados,
-                'con_multa' => $conMulta,
-            ]
+            'total_prestamos' => $totalPrestamos,
+            'total_intereses' => $totalIntereses,
+            'total_pagos_capital' => $totalPagosCapital,
+            'deuda_pendiente' => $deudaPendiente,
         ];
     }
 }
+
