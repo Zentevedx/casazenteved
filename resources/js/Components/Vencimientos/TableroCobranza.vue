@@ -3,11 +3,15 @@
  * TableroCobranza.vue — Panel overlay del tablero de cobranza.
  * Muestra grilla horizontal de 4 semanas × 7 días + lista de recuperación.
  */
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { Link } from '@inertiajs/vue3'
 import axios from 'axios'
 import SemanaBlock from './SemanaBlock.vue'
 import ListaRecuperacion from './ListaRecuperacion.vue'
 import ClienteCard from './ClienteCard.vue'
+import { useFormatters } from '@/Composables/useFormatters'
+
+const { formatCurrency, formatMonto } = useFormatters()
 
 const emit = defineEmits(['close'])
 
@@ -22,7 +26,6 @@ const contadores = ref({})
 const fechaHoy = ref('')
 const mostrarVencidos = ref(true)
 
-const formatCurrency = (val) => new Intl.NumberFormat('es-BO', { style: 'currency', currency: 'BOB' }).format(val ?? 0)
 
 const cargarDatos = async () => {
     loading.value = true
@@ -81,7 +84,7 @@ const nivelesConfig = [
                                         Tablero de Cobranza
                                     </h2>
                                     <!-- Color counter badges al lado del título -->
-                                    <div v-if="!loading" class="flex items-center gap-1.5">
+                                     <div v-if="!loading" class="flex items-center gap-1.5">
                                         <span 
                                             v-for="nivel in nivelesConfig" 
                                             :key="nivel.key"
@@ -90,12 +93,12 @@ const nivelesConfig = [
                                             :title="nivel.label"
                                         >
                                             <span :class="['w-1.5 h-1.5 rounded-full', nivel.dotColor]"></span>
-                                            {{ contadores[nivel.key]?.count ?? 0 }}
+                                            <span class="font-ufc">{{ contadores[nivel.key]?.count ?? 0 }}</span>
                                         </span>
                                     </div>
                                 </div>
                                 <p class="text-[10px] text-gray-500 dark:text-gray-400">
-                                    Hoy + 4 semanas · {{ fechaHoy }} · {{ formatCurrency(kpis.total_por_cobrar) }} por cobrar
+                                    Hoy + 4 semanas · <span class="font-ufc text-xs">{{ fechaHoy }}</span> · <span class="font-ufc text-xs text-red-500 dark:text-red-400">{{ formatCurrency(kpis.total_por_cobrar) }}</span> por cobrar
                                 </p>
                             </div>
                         </div>
@@ -140,7 +143,7 @@ const nivelesConfig = [
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                                     </svg>
                                     <span class="text-xs font-bold text-gray-900 dark:text-white">Cobros Pendientes (ya vencidos)</span>
-                                    <span class="bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300 text-[10px] font-black px-2 py-0.5 rounded-full">
+                                    <span class="font-ufc bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300 text-[10px] font-black px-2 py-0.5 rounded-full">
                                         {{ vencidosAntes.length }}
                                     </span>
                                 </div>

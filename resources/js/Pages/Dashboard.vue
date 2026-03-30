@@ -209,7 +209,7 @@ const chartData = computed(() => {
                                         </div>
                                     </div>
                                     <div class="text-right">
-                                        <p class="text-sm font-black text-gray-900 dark:text-white">{{ formatCurrency(cliente.total_deuda) }}</p>
+                                        <p class="font-ufc text-sm font-black text-gray-900 dark:text-white">{{ formatCurrency(cliente.total_deuda) }}</p>
                                     </div>
                                 </div>
                             </div>

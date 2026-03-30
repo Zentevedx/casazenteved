@@ -2,9 +2,10 @@
 import { ref, computed } from 'vue'
 import { Link } from '@inertiajs/vue3'
 import { PrinterIcon, ExclamationTriangleIcon, ChevronUpIcon, ChevronDownIcon, TableCellsIcon } from '@heroicons/vue/24/outline'
-import dayjs from 'dayjs'
-import utc from 'dayjs/plugin/utc'
-dayjs.extend(utc)
+import { useFormatters } from '@/Composables/useFormatters'
+import EmptyState from '@/Components/UI/EmptyState.vue'
+
+const { formatCurrency, formatTimeLabel: timeLabel, urgencyColor, dayjs } = useFormatters()
 
 const props = defineProps({
     items: { type: Array, default: () => [] },
@@ -13,7 +14,7 @@ const props = defineProps({
 
 const emit = defineEmits(['download-pdf'])
 
-const formatCurrency = (val) => new Intl.NumberFormat('es-BO', { style: 'currency', currency: 'BOB' }).format(val ?? 0)
+// Using formatCurrency from useFormatters
 
 // --- Sorting ---
 const sortKey   = ref('dias_sin_pago')   // default: más tiempo sin pago primero
@@ -49,23 +50,7 @@ const totalCapital = computed(() => props.items.reduce((s, i) => s + Number(i.sa
 const mayorMonto   = computed(() => props.items.length ? Math.max(...props.items.map(i => i.saldo_a_fecha ?? i.monto)) : 0)
 const maxDias      = computed(() => props.items.length ? Math.max(...props.items.map(i => i.dias_sin_pago ?? 0)) : 0)
 
-// Color de urgencia según días sin pago
-const urgencyColor = (dias) => {
-    if (dias >= 180) return 'bg-red-900/30 text-red-300 border border-red-800'   // > 6 meses
-    if (dias >= 90)  return 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400' // 3-6 meses
-    return 'bg-orange-100 dark:bg-orange-500/10 text-orange-700 dark:text-orange-400'
-}
-
-const timeLabel = (dias, meses) => {
-    if (!dias && dias !== 0) return '—'
-    if (meses >= 12) {
-        const anios = Math.floor(meses / 12)
-        const mesesR = meses % 12
-        return mesesR > 0 ? `${anios}a ${mesesR}m` : `${anios} año(s)`
-    }
-    if (meses > 0) return `${meses} mes(es) y ${dias - meses * 30} día(s)`
-    return `${dias} días`
-}
+// Using urgencyColor and timeLabel from useFormatters
 
 const SortIcon = (key) => sortKey.value === key
     ? (sortOrder.value === 'asc' ? ChevronUpIcon : ChevronDownIcon)
@@ -111,107 +96,120 @@ const downloadExcel = () => {
         <div class="grid grid-cols-3 gap-0 border-b border-gray-100 dark:border-gray-800 text-center">
             <div class="py-3 px-4 border-r border-gray-100 dark:border-gray-800">
                 <p class="text-xs text-gray-400 uppercase font-bold">Capital en riesgo</p>
-                <p class="text-lg font-black text-red-600 dark:text-red-400 mt-0.5">{{ formatCurrency(totalCapital) }}</p>
+                <p class="font-ufc text-lg font-black text-red-600 dark:text-red-400 mt-0.5">{{ formatCurrency(totalCapital) }}</p>
             </div>
             <div class="py-3 px-4 border-r border-gray-100 dark:border-gray-800">
                 <p class="text-xs text-gray-400 uppercase font-bold">Mayor monto</p>
-                <p class="text-lg font-black text-gray-900 dark:text-white mt-0.5">{{ formatCurrency(mayorMonto) }}</p>
+                <p class="font-ufc text-lg font-black text-gray-900 dark:text-white mt-0.5">{{ formatCurrency(mayorMonto) }}</p>
             </div>
             <div class="py-3 px-4">
                 <p class="text-xs text-gray-400 uppercase font-bold">Más tiempo inactivo</p>
-                <p class="text-lg font-black text-orange-600 dark:text-orange-400 mt-0.5">{{ maxDias }} días</p>
+                <p class="font-ufc text-lg font-black text-orange-600 dark:text-orange-400 mt-0.5">{{ maxDias }} días</p>
             </div>
         </div>
 
         <!-- Estado vacío -->
-        <div v-if="items.length === 0" class="py-16 text-center">
-            <div class="w-16 h-16 bg-green-100 dark:bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg class="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-                </svg>
-            </div>
-            <p class="text-gray-500 dark:text-gray-400 font-medium">¡Excelente! No hay préstamos en situación de remate.</p>
-            <p class="text-xs text-gray-400 mt-1">Todos los clientes están al día.</p>
-        </div>
+        <EmptyState 
+            v-if="items.length === 0" 
+            title="¡Excelente! No hay préstamos en situación de remate." 
+            description="Todos los clientes están al día." 
+            iconType="success" 
+        />
 
-        <!-- Tabla -->
-        <div v-else class="overflow-x-auto">
-            <table class="w-full text-left">
-                <thead class="bg-gray-50 dark:bg-gray-900/50 text-xs uppercase text-gray-500 dark:text-gray-400 font-bold">
-                    <tr>
-                        <th class="px-5 py-3">#</th>
-                        <th class="px-5 py-3">Código</th>
-                        <th class="px-5 py-3 cursor-pointer hover:text-indigo-500 select-none" @click="toggleSort('cliente')">
-                            <span class="flex items-center gap-1">Cliente <component :is="SortIcon('cliente')" v-if="SortIcon('cliente')" class="w-3 h-3" /></span>
-                        </th>
-                        <th class="px-5 py-3">Artículo(s)</th>
-                        <th class="px-5 py-3 cursor-pointer hover:text-indigo-500 select-none" @click="toggleSort('fecha_prestamo')">
-                            <span class="flex items-center gap-1">Fecha Inicio <component :is="SortIcon('fecha_prestamo')" v-if="SortIcon('fecha_prestamo')" class="w-3 h-3" /></span>
-                        </th>
-                        <th class="px-5 py-3">Últ. Pago</th>
-                        <th class="px-5 py-3 cursor-pointer hover:text-indigo-500 select-none" @click="toggleSort('dias_sin_pago')">
-                            <span class="flex items-center gap-1">Tiempo inactivo <component :is="SortIcon('dias_sin_pago')" v-if="SortIcon('dias_sin_pago')" class="w-3 h-3" /></span>
-                        </th>
-                        <th class="px-5 py-3 cursor-pointer hover:text-indigo-500 select-none text-right" @click="toggleSort('saldo_a_fecha')">
-                            <span class="flex items-center justify-end gap-1">Capital <component :is="SortIcon('saldo_a_fecha')" v-if="SortIcon('saldo_a_fecha')" class="w-3 h-3" /></span>
-                        </th>
-                        <th class="px-5 py-3"></th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
-                    <tr
-                        v-for="(p, index) in sortedItems"
-                        :key="p.id"
-                        class="hover:bg-red-50/30 dark:hover:bg-red-900/10 transition-colors border-l-4 border-l-transparent hover:border-l-red-400"
-                    >
-                        <td class="px-5 py-4 text-xs text-gray-400 font-mono">{{ index + 1 }}</td>
-                        <td class="px-5 py-4 font-bold text-indigo-600 dark:text-indigo-400 font-mono text-sm">{{ p.codigo }}</td>
-                        <td class="px-5 py-4 text-gray-800 dark:text-gray-200 font-medium">{{ p.cliente?.nombre }}</td>
-                        <td class="px-5 py-4 text-gray-500 dark:text-gray-400 text-sm max-w-[180px] truncate">
-                            {{ p.articulos?.map(a => a.nombre).join(', ') || 'Sin artículo' }}
-                        </td>
-                        <td class="px-5 py-4 text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
-                            {{ dayjs(p.fecha_prestamo).utc().format('DD/MM/YYYY') }}
-                        </td>
-                        <td class="px-5 py-4 text-sm whitespace-nowrap">
-                            <span v-if="p.fecha_ultimo_pago" class="text-gray-500 dark:text-gray-400">
-                                {{ dayjs(p.fecha_ultimo_pago).utc().format('DD/MM/YYYY') }}
+        <!-- Layout en Tarjetas (Columnas) -->
+        <div v-else class="p-4 bg-gray-50/50 dark:bg-[#141414] border-t border-gray-100 dark:border-gray-800">
+            <!-- Barra de Ordenación Móvil/Desktop alternativa -->
+            <div class="flex flex-wrap items-center gap-2 mb-4">
+                <span class="text-xs text-gray-500 font-bold uppercase mr-2">Ordenar por:</span>
+                <button @click="toggleSort('cliente')" :class="['px-3 py-1.5 rounded-lg text-xs font-bold border transition', sortKey === 'cliente' ? 'bg-indigo-50 border-indigo-200 text-indigo-700 dark:bg-indigo-900/30 dark:border-indigo-800 dark:text-indigo-400' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50 dark:bg-[#1a1a1a] dark:border-gray-800 dark:text-gray-400']">
+                    Cliente <component :is="SortIcon('cliente')" v-if="SortIcon('cliente')" class="w-3 h-3 inline" />
+                </button>
+                <button @click="toggleSort('dias_sin_pago')" :class="['px-3 py-1.5 rounded-lg text-xs font-bold border transition', sortKey === 'dias_sin_pago' ? 'bg-indigo-50 border-indigo-200 text-indigo-700 dark:bg-indigo-900/30 dark:border-indigo-800 dark:text-indigo-400' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50 dark:bg-[#1a1a1a] dark:border-gray-800 dark:text-gray-400']">
+                    Tiempo <component :is="SortIcon('dias_sin_pago')" v-if="SortIcon('dias_sin_pago')" class="w-3 h-3 inline" />
+                </button>
+                <button @click="toggleSort('saldo_a_fecha')" :class="['px-3 py-1.5 rounded-lg text-xs font-bold border transition', sortKey === 'saldo_a_fecha' ? 'bg-indigo-50 border-indigo-200 text-indigo-700 dark:bg-indigo-900/30 dark:border-indigo-800 dark:text-indigo-400' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50 dark:bg-[#1a1a1a] dark:border-gray-800 dark:text-gray-400']">
+                    Capital <component :is="SortIcon('saldo_a_fecha')" v-if="SortIcon('saldo_a_fecha')" class="w-3 h-3 inline" />
+                </button>
+            </div>
+
+            <!-- Grilla 1 (Movil) -> 2 (Tablet) -> 3 (Desktop) -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div
+                    v-for="(p, index) in sortedItems"
+                    :key="p.id"
+                    class="bg-white dark:bg-[#1c1c1c] rounded-2xl p-5 border border-red-100 dark:border-red-900/30 shadow-sm hover:shadow-lg transition-all flex flex-col relative overflow-hidden group"
+                >
+                    <!-- Red Warning Banner at Top -->
+                    <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-red-500 to-rose-600"></div>
+
+                    <!-- Header Tarjeta -->
+                    <div class="flex justify-between items-start mb-3 mt-1">
+                        <div>
+                            <span class="font-ufc text-xs text-indigo-600 dark:text-indigo-400 tracking-wider block mb-1">
+                                #{{ index + 1 }} · {{ p.codigo }}
                             </span>
-                            <span v-else class="text-red-500 font-bold text-xs">NINGUNO</span>
-                        </td>
-                        <td class="px-5 py-4">
-                            <span :class="['px-2.5 py-1 rounded-full text-xs font-black whitespace-nowrap', urgencyColor(p.dias_sin_pago ?? 0)]">
+                            <h4 class="font-bold text-gray-900 dark:text-white leading-tight">
+                                {{ p.cliente?.nombre }}
+                            </h4>
+                        </div>
+                        <div class="text-right shrink-0">
+                            <span :class="['inline-block px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider', urgencyColor(p.dias_sin_pago ?? 0)]">
                                 {{ timeLabel(p.dias_sin_pago, p.meses_sin_pago) }}
                             </span>
-                            <p class="text-xs text-gray-400 mt-0.5 pl-1">{{ p.dias_sin_pago ?? '—' }} días exactos</p>
-                        </td>
-                        <td class="px-5 py-4 text-right font-black text-red-600 dark:text-red-400 whitespace-nowrap">
-                            {{ formatCurrency(p.saldo_a_fecha ?? p.monto) }}
-                        </td>
-                        <td class="px-5 py-4 text-right">
-                            <Link
-                                v-if="p.cliente_id_ref"
-                                :href="route('clientes.detalle', p.cliente_id_ref)"
-                                class="text-indigo-600 dark:text-indigo-400 text-sm font-bold hover:underline whitespace-nowrap"
-                            >
-                                Ver →
-                            </Link>
-                        </td>
-                    </tr>
-                </tbody>
-                <!-- Footer con total -->
-                <tfoot class="bg-red-50 dark:bg-red-900/20 font-bold text-sm border-t-2 border-red-200 dark:border-red-800">
-                    <tr>
-                        <td colspan="7" class="px-5 py-3 text-red-700 dark:text-red-300 uppercase text-xs tracking-wider">
-                            TOTAL EN RIESGO ({{ items.length }} préstamos)
-                        </td>
-                        <td class="px-5 py-3 text-right text-red-700 dark:text-red-300 text-base font-black">
-                            {{ formatCurrency(totalCapital) }}
-                        </td>
-                        <td></td>
-                    </tr>
-                </tfoot>
-            </table>
+                        </div>
+                    </div>
+
+                    <!-- Articulo -->
+                    <div class="bg-gray-50 dark:bg-[#141414] rounded-xl p-3 mb-4 flex-1 border border-gray-100 dark:border-gray-800">
+                        <p class="text-[10px] text-gray-400 uppercase font-bold mb-1">En Garantía</p>
+                        <p class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                            {{ p.articulos?.map(a => a.nombre_articulo + (a.descripcion ? ` (${a.descripcion})` : '')).join(' • ') || 'Sin artículo' }}
+                        </p>
+                    </div>
+
+                    <!-- Fechas y Saldos -->
+                    <div class="grid grid-cols-2 gap-3 mb-4">
+                        <div>
+                            <p class="text-[10px] text-gray-400 uppercase font-bold">F. Inicio</p>
+                            <p class="font-ufc text-xs text-gray-600 dark:text-gray-400">{{ dayjs(p.fecha_prestamo).utc().format('DD/MM/YYYY') }}</p>
+                        </div>
+                        <div>
+                            <p class="text-[10px] text-gray-400 uppercase font-bold">Último Pago</p>
+                            <p v-if="p.fecha_ultimo_pago" class="font-ufc text-xs text-gray-600 dark:text-gray-400">{{ dayjs(p.fecha_ultimo_pago).utc().format('DD/MM/YYYY') }}</p>
+                            <p v-else class="text-xs font-bold text-red-500">NINGUNO</p>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center justify-between pt-4 border-t border-gray-100 dark:border-gray-800">
+                        <div>
+                            <p class="text-[10px] text-gray-400 uppercase font-bold">Capital Adeudado</p>
+                            <p class="font-ufc text-lg font-black text-red-600 dark:text-red-400 block -mt-1">
+                                {{ formatCurrency(p.saldo_a_fecha ?? p.monto) }}
+                            </p>
+                        </div>
+                        <Link
+                            v-if="p.cliente_id_ref"
+                            :href="route('clientes.detalle', p.cliente_id_ref)"
+                            class="w-10 h-10 rounded-full bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400 hover:bg-indigo-600 hover:text-white dark:hover:bg-indigo-500 transition-colors flex items-center justify-center shrink-0"
+                            title="Ver Perfil"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-4 h-4">
+                              <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                            </svg>
+                        </Link>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Total Footer en Grilla -->
+            <div class="mt-4 p-4 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 flex justify-between items-center flex-wrap gap-4">
+                <span class="text-red-700 dark:text-red-300 uppercase text-xs font-black tracking-wider">
+                    TOTAL EN RIESGO ({{ items.length }} préstamos)
+                </span>
+                <span class="font-ufc text-red-700 dark:text-red-300 text-xl font-black">
+                    {{ formatCurrency(totalCapital) }}
+                </span>
+            </div>
         </div>
     </div>
 </template>

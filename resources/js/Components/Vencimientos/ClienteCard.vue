@@ -36,25 +36,38 @@ const irADetalle = () => {
     <button
         @click="irADetalle"
         :class="[
-            'w-full px-2 py-1.5 rounded-md border-2 text-left transition-all duration-150 flex items-center justify-between gap-1 shadow-sm',
-            'hover:scale-[1.03] hover:shadow-md cursor-pointer hover:brightness-105',
+            'w-full p-2.5 rounded-lg border-2 text-left transition-all duration-150 flex flex-col gap-1.5 shadow-sm',
+            'hover:scale-[1.02] hover:shadow-md cursor-pointer hover:brightness-105',
             colors.bg, colors.border
         ]"
         :title="`${prestamo.cliente_nombre} — Bs ${prestamo.saldo_pendiente} — ${prestamo.dias_envejecimiento}d`"
     >
-        <p :class="['text-xs font-extrabold truncate', colors.text]">
-            {{ prestamo.codigo }}
-        </p>
-        <div class="flex items-center gap-1.5 shrink-0">
+        <div class="flex items-center justify-between w-full">
+            <p :class="['font-ufc text-sm font-extrabold truncate uppercase tracking-widest', colors.text]">
+                {{ prestamo.codigo }}
+            </p>
             <span 
                 v-if="prestamo.dias_envejecimiento > 0" 
-                :class="['text-[10px] font-black px-1.5 py-0.5 rounded-sm', colors.bg, colors.text]"
+                :class="['font-ufc text-[9px] font-black px-1.5 py-0.5 rounded flex-shrink-0', colors.bg, colors.text]"
                 style="filter: brightness(0.9);"
             >
                 {{ prestamo.dias_envejecimiento }}d
             </span>
-            <p class="text-xs font-black text-gray-900 dark:text-white">
-                Bs{{ formatMonto(prestamo.saldo_pendiente) }}
+        </div>
+        
+        <p class="text-xs text-gray-900 dark:text-gray-100 font-bold truncate w-full" style="line-height: 1.2;">
+            {{ prestamo.cliente_nombre }}
+        </p>
+        
+        <div class="bg-black/5 dark:bg-white/5 rounded px-1.5 py-1 w-full border border-black/5 dark:border-white/5">
+           <p class="text-[9px] font-medium opacity-80 truncate line-clamp-1 w-full" style="line-height: 1.1;">
+                {{ prestamo.articulos?.length ? prestamo.articulos.map(a => a.nombre + (a.detalle ? ' - '+a.detalle : '')).join(', ') : 'Sin artículo' }}
+           </p>
+        </div>
+        
+        <div class="mt-1 flex justify-end w-full">
+            <p class="font-ufc text-base font-black text-gray-900 dark:text-white" style="line-height: 1;">
+                Bs. {{ formatMonto(prestamo.saldo_pendiente) }}
             </p>
         </div>
     </button>

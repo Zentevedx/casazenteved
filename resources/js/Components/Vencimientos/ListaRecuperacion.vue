@@ -1,4 +1,8 @@
 <script setup>
+import { Link } from '@inertiajs/vue3';
+import { useFormatters } from '@/Composables/useFormatters';
+import EmptyState from '@/Components/UI/EmptyState.vue';
+
 /**
  * ListaRecuperacion.vue — Tabla de préstamos con >120 días vencidos (remate/subasta).
  * Excluidos del calendario, mostrados en una tabla de recuperación.
@@ -7,7 +11,7 @@ const props = defineProps({
     prestamos: { type: Array, default: () => [] }
 })
 
-const formatCurrency = (val) => new Intl.NumberFormat('es-BO', { style: 'currency', currency: 'BOB' }).format(val ?? 0)
+const { formatCurrency } = useFormatters();
 
 const formatDate = (dateStr) => {
     if (!dateStr) return '—'
@@ -30,7 +34,7 @@ const formatDate = (dateStr) => {
                 <h3 class="text-sm font-bold text-gray-900 dark:text-white">Registro de Recuperación / Remate</h3>
                 <p class="text-[10px] text-gray-500">Préstamos con más de 120 días vencidos — Ordenados por antigüedad</p>
             </div>
-            <span class="ml-auto bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-300 text-xs font-black px-3 py-1 rounded-full">
+            <span class="ml-auto bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-300 text-xs font-black px-3 py-1 rounded-full font-ufc">
                 {{ prestamos.length }}
             </span>
         </div>
@@ -57,13 +61,13 @@ const formatDate = (dateStr) => {
                             <p class="font-bold text-gray-900 dark:text-white">{{ p.cliente_nombre }}</p>
                         </td>
                         <td class="px-4 py-3">
-                            <span class="font-mono text-xs text-gray-500">{{ p.codigo }}</span>
+                            <span class="font-ufc text-xs text-gray-500 tracking-wider">{{ p.codigo }}</span>
                         </td>
                         <td class="px-4 py-3 text-right">
-                            <span class="font-black text-red-600 dark:text-red-400">{{ formatCurrency(p.saldo_pendiente) }}</span>
+                            <span class="font-ufc text-base text-red-600 dark:text-red-400">{{ formatCurrency(p.saldo_pendiente) }}</span>
                         </td>
                         <td class="px-4 py-3 text-center">
-                            <span class="bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-300 text-xs font-black px-2 py-0.5 rounded-full">
+                            <span class="font-ufc bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-300 text-xs font-black px-2 py-0.5 rounded-full">
                                 {{ p.dias_envejecimiento }}d
                             </span>
                         </td>

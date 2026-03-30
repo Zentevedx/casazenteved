@@ -32,7 +32,7 @@ const themes = {
                 {{ title }}
             </p>
             
-            <h3 class="text-3xl font-bold text-gray-900 dark:text-white tracking-tight">{{ value }}</h3>
+            <h3 class="font-ufc text-3xl font-bold text-gray-900 dark:text-white tracking-tight">{{ value }}</h3>
             
             <div v-if="trend !== undefined" class="mt-3 flex items-center gap-2">
                 <span :class="['text-xs font-bold px-2 py-0.5 rounded-full flex items-center gap-1', trend >= 0 ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : 'bg-red-500/10 text-red-600 dark:text-red-400']">

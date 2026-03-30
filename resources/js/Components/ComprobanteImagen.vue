@@ -82,7 +82,7 @@
                 <div style="display:flex; gap:8px;">
                   <div style="flex:1; background:#1a1a1a; border-radius:10px; padding:10px 12px; border:1px solid #222;">
                     <p style="font-size:8px; color:#6b7280; font-weight:700; text-transform:uppercase; letter-spacing:2px; margin:0 0 4px;">Fecha</p>
-                    <p style="font-size:11px; font-weight:700; color:#e5e7eb; margin:0;">{{ formatearFecha(data.created_at || data.fecha_pago || new Date()) }}</p>
+                    <p style="font-size:11px; font-weight:700; color:#e5e7eb; margin:0;">{{ formatearFecha(tipo === 'pago' ? (data.fecha_pago || data.created_at) : (data.fecha_prestamo || data.created_at)) }}</p>
                   </div>
                   <div style="flex:1; background:#1a1a1a; border-radius:10px; padding:10px 12px; border:1px solid #222;">
                     <p style="font-size:8px; color:#6b7280; font-weight:700; text-transform:uppercase; letter-spacing:2px; margin:0 0 4px;">
@@ -250,23 +250,7 @@ const finalGeneratedCode = ref('');
 
 watch(() => props.show, (newVal) => {
     if (newVal) {
-        let currentCode = '';
-        if (props.data?.codigo_comprobante && String(props.data.codigo_comprobante).trim()) {
-            currentCode = String(props.data.codigo_comprobante);
-        } else if (props.data?.codigo && String(props.data.codigo).trim()) {
-            currentCode = String(props.data.codigo);
-        } else if (props.prestamoReferencia?.codigo && String(props.prestamoReferencia.codigo).trim()) {
-            currentCode = String(props.prestamoReferencia.codigo) + (props.data?.id || 'P');
-        }
-
-        if (currentCode) {
-            let clean = currentCode.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
-            if (clean.length > 5) clean = clean.substring(0, 5);
-            if (clean.length === 0) clean = random5CharString();
-            finalGeneratedCode.value = clean;
-        } else {
-            finalGeneratedCode.value = random5CharString();
-        }
+        finalGeneratedCode.value = random5CharString();
     }
 }, { immediate: true });
 
@@ -274,6 +258,7 @@ const computedCodigo = computed(() => finalGeneratedCode.value);
 
 // ── Formateo ──
 const formatearFecha = (fechaStr) => {
+    if (!fechaStr) return '';
     const d = new Date(fechaStr);
     return d.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' }).toUpperCase();
 };

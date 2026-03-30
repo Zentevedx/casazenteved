@@ -744,14 +744,6 @@ const calcularEdad = (fecha) => {
 </template>
 
 <style scoped>
-@font-face {
-    font-family: 'UFCSans';
-    src: url('/Fuentes/UFCSans-Bold.ttf') format('truetype');
-    font-weight: 700;
-    font-style: normal;
-    font-display: swap;
-}
-
 .avatar-initials {
     font-family: 'UFCSans', sans-serif;
     font-weight: 700;
