@@ -10,6 +10,7 @@ import {
     ArchiveBoxIcon,
     XMarkIcon
 } from '@heroicons/vue/24/outline'
+import Avatar from '@/Components/Avatar.vue'
 
 const q = ref('')
 const resultados = ref([])
@@ -17,31 +18,7 @@ const showModal = ref(false)
 const inputRef = ref(null)
 const loading = ref(false)
 
-// Colors gradients for avatars
-const avatarGradients = [
-    'from-red-500 to-orange-500',
-    'from-amber-500 to-yellow-500',
-    'from-green-500 to-emerald-500',
-    'from-teal-500 to-cyan-500',
-    'from-blue-500 to-indigo-500',
-    'from-violet-500 to-purple-500',
-    'from-fuchsia-500 to-pink-500',
-    'from-rose-500 to-red-500'
-];
-
-const getAvatarGradient = (name) => {
-    if (!name) return avatarGradients[0];
-    let hash = 0;
-    for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
-    return avatarGradients[Math.abs(hash) % avatarGradients.length];
-}
-
-const getInitials = (name) => {
-    if (!name) return '??';
-    const parts = name.trim().split(' ');
-    if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
-    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-}
+// Avatar Gradients logic has been migrated back to Avatar.vue Component
 
 let debounceTimer = null;
 let abortController = null;
@@ -174,15 +151,17 @@ onUnmounted(() => window.removeEventListener('keydown', handleKeydown));
             >
                 <!-- Avatar / Icon -->
                 <div class="shrink-0 relative">
-                    <div class="absolute -inset-1 rounded-full blur opacity-0 group-hover:opacity-40 transition duration-300"
-                        :class="item.tipo === 'Cliente' ? 'bg-gradient-to-r ' + getAvatarGradient(item.titulo) : 'bg-indigo-500'">
+                    <div class="absolute -inset-1 rounded-full blur opacity-0 group-hover:opacity-40 transition duration-300 bg-indigo-500">
                     </div>
                     
-                    <div v-if="item.tipo === 'Cliente'" 
-                         class="relative h-12 w-12 rounded-xl bg-gradient-to-br flex items-center justify-center text-sm font-bold text-white shadow-lg"
-                         :class="getAvatarGradient(item.titulo)">
-                        {{ getInitials(item.titulo) }}
-                    </div>
+                    <Avatar 
+                        v-if="item.tipo === 'Cliente'"
+                        :name="item.titulo"
+                        :identifier="item.titulo"
+                        sizeClass="h-12 w-12 text-sm"
+                        roundedClass="rounded-xl"
+                        class="shadow-lg"
+                    />
 
                     <div v-else-if="item.tipo === 'Prestamo'" 
                          class="relative h-12 w-12 rounded-xl bg-indigo-900/50 text-indigo-400 border border-indigo-500/30 flex items-center justify-center">

@@ -68,7 +68,7 @@ const chartData = computed(() => {
         <div class="min-h-screen pb-20 font-sans selection:bg-indigo-500 selection:text-white">
             
             <!-- Sticky Modern Header -->
-            <div class="sticky top-0 z-40 bg-white/80 dark:bg-dark-bg/95 backdrop-blur-xl border-b border-gray-200 dark:border-gray-800 shadow-sm dark:shadow-xl transition-all duration-300">
+            <div class="sticky top-0 z-40 bg-white/80 dark:bg-zinc-950/95 backdrop-blur-xl border-b border-gray-200 dark:border-gray-800 shadow-sm dark:shadow-xl transition-all duration-300">
                 <div class="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-4">
                     <div class="flex flex-col md:flex-row justify-between items-center gap-4">
                         

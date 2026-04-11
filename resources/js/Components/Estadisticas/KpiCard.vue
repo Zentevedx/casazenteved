@@ -23,7 +23,7 @@ const themes = {
 </script>
 
 <template>
-    <div class="bg-white dark:bg-dark-surface p-5 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-md dark:shadow-xl relative overflow-hidden group transition-all duration-300 hover:-translate-y-1 hover:shadow-lg dark:hover:shadow-2xl">
+    <div class="bg-white dark:bg-zinc-900 p-5 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-md dark:shadow-xl relative overflow-hidden group transition-all duration-300 hover:-translate-y-1 hover:shadow-lg dark:hover:shadow-2xl">
         <!-- Glow Effect -->
         <div :class="['absolute -right-6 -top-6 w-24 h-24 rounded-full transition-colors duration-500 blur-2xl opacity-20 dark:opacity-40', themes[colorTheme].bg]"></div>
         

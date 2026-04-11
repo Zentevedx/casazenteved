@@ -35,12 +35,10 @@ class BusquedaGlobalController extends Controller
             ]);
 
         // 2. Préstamos (Búsqueda Inteligente: Código o Monto)
-        // Usamos whereRaw para forzar la comparación en minúsculas y asegurar compatibilidad
+        // 2. Préstamos (Búsqueda Inteligente: Código o Monto)
         $prestamos = Prestamo::with('cliente')
-            ->where(function($q) use ($query, $queryLower) {
-                // Opción A: Coincide con el Código (ignorando mayúsculas/minúsculas)
-                $q->whereRaw('LOWER(codigo) LIKE ?', ["%{$queryLower}%"])
-                // Opción B: Coincide con el Monto
+            ->where(function($q) use ($query) {
+                $q->where('codigo', 'like', "%{$query}%")
                   ->orWhere('monto', 'like', "%{$query}%");
             })
             ->limit(5)
@@ -69,6 +67,6 @@ class BusquedaGlobalController extends Controller
                             : '#'
             ]);
 
-        return response()->json($clientes->merge($prestamos)->merge($articulos));
+        return response()->json(array_merge($clientes->toArray(), $prestamos->toArray(), $articulos->toArray()));
     }
 }

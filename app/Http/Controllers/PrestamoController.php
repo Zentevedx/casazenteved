@@ -6,14 +6,16 @@ use App\Models\Prestamo;
 use App\Models\Articulo;
 use App\Models\Caja; // <--- IMPORTANTE: Modelo Caja importado
 use App\Models\Cliente;
+use App\Services\PrestamoService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Spatie\Browsershot\Browsershot;
 use Inertia\Inertia;
-use Illuminate\Support\Str;
 
 class PrestamoController extends Controller
 {
+    public function __construct(protected PrestamoService $prestamoService)
+    {
+    }
     public function index(Request $request)
     {
         $search = $request->input('search');
@@ -61,49 +63,9 @@ class PrestamoController extends Controller
             'multa_por_retraso' => 'required|numeric|min:0',
         ]);
 
-        DB::transaction(function () use ($request) {
-            // Generar código único para el comprobante
-            $codigoComprobante = 'PRE-' . strtoupper(Str::random(8));
-
-            // 1. Crear el Préstamo
-            $prestamo = Prestamo::create([
-                'codigo' => $request->codigo,
-                'cliente_id' => $request->cliente_id,
-                'monto' => $request->monto,
-                'fecha_prestamo' => $request->fecha_prestamo,
-                'multa_por_retraso' => $request->multa_por_retraso,
-                'codigo_comprobante' => $codigoComprobante,
-            ]);
-
-            // Guardar artículos
-            foreach ($request->articulos as $articulo) {
-                $fotoPath = null;
-                if (isset($articulo['foto_url']) && is_file($articulo['foto_url'])) {
-                    $fotoPath = $articulo['foto_url']->store('articulos', 'public');
-                }
-
-                $prestamo->articulos()->create([
-                    'nombre_articulo' => strtoupper($articulo['nombre_articulo']),
-                    'descripcion' => strtoupper($articulo['descripcion']),
-                    'foto_url' => $fotoPath,
-                ]);
-            }
-
-            // 2. AUTOMATIZACIÓN CAJA: Registrar Salida (Egreso)
-            // Obtenemos el saldo actual para calcular el nuevo
-            $ultimoSaldo = Caja::latest('id')->value('saldo_caja') ?? 0;
-
-            Caja::create([
-                'tipo_movimiento' => 'Egreso',
-                'origen'          => 'Prestamo',
-                'descripcion'     => "Préstamo otorgado: {$prestamo->codigo}",
-                'monto'           => $prestamo->monto,
-                'saldo_caja'      => $ultimoSaldo - $prestamo->monto, // Restamos el dinero
-                'fecha'           => $prestamo->fecha_prestamo,
-                'referencia_id'   => $prestamo->id,
-                'referencia_tabla'=> 'prestamos',
-            ]);
-        });
+        $datosPrestamo = $request->only(['codigo', 'cliente_id', 'monto', 'fecha_prestamo', 'multa_por_retraso']);
+        
+        $this->prestamoService->crearPrestamo($datosPrestamo, $request->articulos ?? []);
 
         return redirect()->route('prestamos.index')->with('success', 'Préstamo creado y dinero descontado de caja.');
     }
@@ -118,35 +80,9 @@ class PrestamoController extends Controller
             'multa_por_retraso' => 'required|numeric|min:0',
         ]);
 
-        DB::transaction(function () use ($request, $prestamo) {
-            // Nota: Si cambias el monto aquí, idealmente deberías ajustar la caja también.
-            // Por simplicidad, esta actualización solo toca el préstamo y sus artículos.
-            
-            $prestamo->update([
-                'codigo' => $request->codigo,
-                'cliente_id' => $request->cliente_id,
-                'monto' => $request->monto,
-                'fecha_prestamo' => $request->fecha_prestamo,
-                'multa_por_retraso' => $request->multa_por_retraso,
-            ]);
-
-            $prestamo->articulos()->delete();
-
-            foreach ($request->articulos as $articulo) {
-                $fotoPath = null;
-                if (isset($articulo['foto_url']) && is_file($articulo['foto_url'])) {
-                    $fotoPath = $articulo['foto_url']->store('articulos', 'public');
-                } elseif (is_string($articulo['foto_url'])) {
-                    $fotoPath = $articulo['foto_url'];
-                }
-
-                $prestamo->articulos()->create([
-                    'nombre_articulo' => strtoupper($articulo['nombre_articulo']),
-                    'descripcion' => strtoupper($articulo['descripcion']),
-                    'foto_url' => $fotoPath,
-                ]);
-            }
-        });
+        $datosPrestamo = $request->only(['codigo', 'cliente_id', 'monto', 'fecha_prestamo', 'multa_por_retraso']);
+        
+        $this->prestamoService->actualizarPrestamo($prestamo, $datosPrestamo, $request->articulos ?? []);
 
         return redirect()->route('prestamos.index')->with('success', 'Préstamo actualizado correctamente.');
     }
@@ -196,16 +132,7 @@ class PrestamoController extends Controller
             'estado' => 'required|in:Activo,Pagado,Vencido,Cancelado'
         ]);
 
-        DB::transaction(function () use ($request, $prestamo) {
-            $prestamo->update([
-                'estado' => $request->estado
-            ]);
-
-            // Si el estado cambia a Pagado o RetiradoLogic, liberamos los articulos
-            if ($request->estado === 'Pagado') {
-                $prestamo->articulos()->update(['estado' => 'Retirado']);
-            }
-        });
+        $this->prestamoService->actualizarEstado($prestamo, $request->estado);
 
         return back()->with('success', 'Estado del préstamo actualizado correctamente.');
     }

@@ -4,6 +4,7 @@ import { router, Link } from '@inertiajs/vue3'
 import Layout from '@/Layouts/AuthenticatedLayout.vue'
 import Pagination from '@/Components/Pagination.vue'
 import { MagnifyingGlassIcon, PlusIcon, PencilSquareIcon, DocumentTextIcon, FunnelIcon } from '@heroicons/vue/24/outline'
+import Avatar from '@/Components/Avatar.vue'
 
 const props = defineProps({ prestamos: Object, filters: Object })
 const search = ref(props.filters?.search || '')
@@ -16,23 +17,7 @@ watch(search, (value) => {
   })
 })
 
-function obtenerIniciales(nombre) {
-    if (!nombre) return '??';
-  const partes = nombre.trim().split(' ')
-  const nombre1 = partes[0] || ''
-  const apellido = partes[1] || ''
-  return (nombre1.charAt(0) + apellido.charAt(0)).toUpperCase()
-}
-
-function getAvatarGradient(id) {
-    const gradients = [
-        'from-blue-500 to-cyan-500', 
-        'from-purple-500 to-fuchsia-500', 
-        'from-emerald-500 to-teal-500',
-        'from-orange-500 to-amber-500'
-    ];
-    return gradients[id % gradients.length];
-}
+// Avatar logic migrated to Avatar.vue
 
 const formatCurrency = (val) => new Intl.NumberFormat('es-BO', { style: 'currency', currency: 'BOB' }).format(val);
 
@@ -112,9 +97,13 @@ const getStatusColor = (status) => {
                             </td>
                             <td class="px-6 py-4">
                                 <div class="flex items-center gap-3">
-                                    <div :class="['w-8 h-8 rounded-full bg-gradient-to-br flex items-center justify-center text-white font-bold text-[10px] shadow-sm', getAvatarGradient(prestamo.cliente?.id || 0)]">
-                                        {{ obtenerIniciales(prestamo.cliente?.nombre || '') }}
-                                    </div>
+                                    <Avatar 
+                                        :name="prestamo.cliente?.nombre || '?'"
+                                        :identifier="prestamo.cliente?.id || 0"
+                                        :foto-url="prestamo.cliente?.foto_url || null"
+                                        size-class="w-8 h-8 text-[10px]"
+                                        rounded-class="rounded-full"
+                                    />
                                     <span class="text-gray-900 dark:text-gray-200 font-medium">{{ prestamo.cliente?.nombre || 'Desconocido' }}</span>
                                 </div>
                             </td>

@@ -4,6 +4,7 @@ import { router, Link } from '@inertiajs/vue3'
 import Layout from '@/Layouts/AuthenticatedLayout.vue'
 import Pagination from '@/Components/Pagination.vue'
 import { MagnifyingGlassIcon, UserPlusIcon, PencilSquareIcon, TrashIcon } from '@heroicons/vue/24/outline'
+import Avatar from '@/Components/Avatar.vue'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 dayjs.extend(relativeTime)
@@ -22,26 +23,7 @@ watch(search, (value) => {
   })
 })
 
-function obtenerIniciales(nombreCompleto) {
-  if (!nombreCompleto) return '??'
-  const partes = nombreCompleto.trim().split(' ')
-  const nombre = partes[0] || ''
-  const apellido = partes.length > 1 ? partes[partes.length - 1] : ''
-  return (nombre.charAt(0) + apellido.charAt(0)).toUpperCase()
-}
-
-// Consistent gradients for avatars
-function getAvatarGradient(id) {
-    const gradients = [
-        'from-indigo-500 to-purple-500', 
-        'from-emerald-500 to-teal-500', 
-        'from-orange-500 to-amber-500', 
-        'from-pink-500 to-rose-500', 
-        'from-cyan-500 to-blue-500'
-    ];
-    return gradients[id % gradients.length];
-}
-
+// Avatar logic replaced by Avatar.vue
 function eliminar(id) {
   if (confirm('¿Estás seguro de eliminar este cliente? Se borrará su historial.')) {
     router.delete(route('clientes.destroy', id))
@@ -116,9 +98,13 @@ function calcularEdad(fecha) {
                         <tr v-for="cliente in clientes.data" :key="cliente.id" class="group hover:bg-gray-50 dark:hover:bg-white/[0.02] transition-colors">
                             <td class="px-6 py-4">
                                 <div class="flex items-center gap-4">
-                                    <div :class="['w-10 h-10 rounded-full bg-gradient-to-br flex items-center justify-center text-white font-bold text-xs shadow-inner', getAvatarGradient(cliente.id)]">
-                                        {{ obtenerIniciales(cliente.nombre) }}
-                                    </div>
+                                    <Avatar 
+                                        :name="cliente.nombre" 
+                                        :identifier="cliente.id"
+                                        :foto-url="cliente.foto_url"
+                                        size-class="w-10 h-10 text-[10px]"
+                                        rounded-class="rounded-full"
+                                    />
                                     <div>
                                         <p class="font-bold text-gray-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">{{ cliente.nombre }}</p>
                                         <p class="text-xs text-gray-500">{{ cliente.direccion || 'Sin dirección' }}</p>

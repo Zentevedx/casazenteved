@@ -22,7 +22,7 @@ const formatCurrency = (value) => new Intl.NumberFormat('es-BO', { style: 'curre
 </script>
 
 <template>
-    <div class="bg-white dark:bg-dark-surface rounded-[28px] overflow-hidden shadow-sm transition-all duration-300 border border-gray-100 dark:border-gray-800">
+    <div class="bg-white dark:bg-zinc-900 rounded-[28px] overflow-hidden shadow-sm transition-all duration-300 border border-gray-100 dark:border-gray-800">
         
         <!-- Header del Mes -->
         <div @click="toggleMes" 

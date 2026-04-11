@@ -58,7 +58,7 @@
               <!-- ──── AVATAR + CLIENTE ──── -->
               <div class="relative z-10 flex items-center gap-3 px-5 pt-5 pb-3" style="border-bottom: 1px solid #222;">
                 <!-- Avatar con iniciales -->
-                <div :style="avatarStyle" style="width:52px; height:52px; border-radius:14px; display:flex; align-items:center; justify-content:center; flex-shrink:0; font-size:18px; font-weight:900; color:#fff; letter-spacing:-1px; text-shadow: 0 1px 3px rgba(0,0,0,0.4);">
+                <div :style="avatarStyle" style="width:52px; height:52px; border-radius:14px; display:flex; align-items:center; justify-content:center; flex-shrink:0; font-size:26px; font-weight:500; color:#fff; letter-spacing:1px; text-shadow: 0 1px 3px rgba(0,0,0,0.4); font-family: 'UFCSansCondensedMedium', sans-serif; overflow:hidden;">
                   {{ getInitials(cliente.nombre + ' ' + (cliente.apellidos || '')) }}
                 </div>
                 <div style="flex:1; min-width:0;">
@@ -218,8 +218,8 @@ const currentYear = new Date().getFullYear();
 
 // ── Iniciales del cliente ──
 const getInitials = (fullName) => {
-    if (!fullName) return '?';
-    return fullName.trim().split(/\s+/).map(n => n[0]).filter(Boolean).slice(0, 2).join('').toUpperCase();
+    if (!fullName) return '???';
+    return fullName.trim().split(/\s+/).map(n => n[0]).filter(Boolean).slice(0, 3).join('').toUpperCase();
 };
 
 // ── Gradiente para avatar (basado en ID del cliente) ──
@@ -233,8 +233,11 @@ const avatarColors = [
 ];
 
 const avatarStyle = computed(() => {
-    const id = props.cliente?.id || 0;
-    const [c1, c2] = avatarColors[id % avatarColors.length];
+    const nombreStr = String(props.cliente?.nombre || 'A');
+    let sum = 0;
+    for(let i=0; i<nombreStr.length; i++) sum += nombreStr.charCodeAt(i);
+    
+    const [c1, c2] = avatarColors[sum % avatarColors.length];
     return `background: linear-gradient(135deg, ${c1}, ${c2}); box-shadow: 0 4px 12px rgba(0,0,0,0.3);`;
 });
 

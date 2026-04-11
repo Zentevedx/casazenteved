@@ -99,7 +99,7 @@ watch([flashSuccess, flashError], () => {
 </script>
 
 <template>
-    <div class="h-screen bg-gray-50 dark:bg-dark-bg flex overflow-hidden">
+    <div class="h-screen bg-gray-50 dark:bg-zinc-950 flex overflow-hidden">
         
         <!-- SIDEBAR (Desktop) -->
         <aside 
@@ -244,7 +244,7 @@ watch([flashSuccess, flashError], () => {
         </aside>
 
         <!-- MAIN CONTENT AREA -->
-        <div class="flex-1 flex flex-col min-w-0 bg-gray-50 dark:bg-dark-bg transition-all duration-300 relative">
+        <div class="flex-1 flex flex-col min-w-0 bg-gray-50 dark:bg-zinc-950 transition-all duration-300 relative">
             
             <!-- FLASH MESSAGES (Toast) -->
             <Transition
