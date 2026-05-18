@@ -13,3 +13,18 @@
         font-weight: 700;
     }
 }
+
+/* ── Formularios siempre en MAYÚSCULAS ───────────────────────── */
+@layer base {
+    input:not([type="password"]):not([type="email"]):not([type="url"]):not([type="number"]),
+    textarea,
+    select {
+        text-transform: uppercase;
+    }
+
+    /* Placeholders también en mayúsculas */
+    input:not([type="password"]):not([type="email"]):not([type="url"]):not([type="number"])::placeholder,
+    textarea::placeholder {
+        text-transform: uppercase;
+    }
+}

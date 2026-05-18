@@ -23,7 +23,8 @@ class BusquedaGlobalController extends Controller
         // 1. Clientes (Búsqueda por Nombre o CI)
         $clientes = Cliente::where(function($q) use ($query) {
                 $q->where('nombre', 'like', "%{$query}%")
-                  ->orWhere('ci', 'like', "%{$query}%");
+                  ->orWhere('ci', 'like', "%{$query}%")
+                  ->orWhere('telefono', 'like', "%{$query}%");
             })
             ->limit(5)
             ->get()
