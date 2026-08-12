@@ -85,6 +85,11 @@ Route::get('/estadisticas', [EstadisticasController::class, 'index'])->name('est
     Route::put('/prestamos/{prestamo}/basico', [PrestamoController::class, 'actualizarBasico'])->name('prestamos.actualizarBasico');
  
     Route::resource('clientes',  ClienteController::class);
+    
+    /* VISTAS DE MORA POR RANGO (DEBEN IR ANTES DE resource PRESTAMOS) */
+    Route::get('/prestamos/por-mora', [PrestamoController::class, 'porMora'])->name('prestamos.porMora');
+    Route::get('/prestamos/por-mora/{rango}', [PrestamoController::class, 'porMora'])->name('prestamos.porMora.rango');
+    
     Route::resource('prestamos', PrestamoController::class);
     Route::get('/prestamos/{prestamo}/pdf', [PrestamoController::class, 'generarPdf'])->name('prestamos.pdf');
     Route::resource('articulos', ArticuloController::class);

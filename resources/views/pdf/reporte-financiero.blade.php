@@ -61,18 +61,10 @@
     
     <!-- CONTENIDO DINÁMICO SEGÚN TIPO -->
 
-    <!-- 1. RESUMEN O REMATE -->
-    @if($tipo === 'resumen' || $tipo === 'remate')
-        @if($tipo === 'remate')
-            <div class="section-title">DETALLE DE PRÉSTAMOS EN REMATE — CAPITAL EN RIESGO</div>
-        @else
-            <div class="section-title">RESUMEN DE PRÉSTAMOS EN RIESGO DE REMATE</div>
-        @endif
-
-        @php
-            $totalRemate = 0;
-        @endphp
-
+    <!-- 1. RESUMEN -->
+    @if($tipo === 'resumen')
+        <div class="section-title">RESUMEN DE PRÉSTAMOS EN RIESGO DE REMATE</div>
+        @php $totalRemate = 0; @endphp
         <table>
             <thead>
                 <tr>
@@ -90,17 +82,13 @@
             <tbody>
                 @forelse($prestamosRemate as $p)
                     @php
-                        // Usar campos pre-calculados si existen (desde reporteFinanciero)
-                        // Si no, calcular (desde generarPdfFinanciero / exportarExcelFinanciero)
                         if (isset($p->dias_sin_pago)) {
                             $diasSinPago   = $p->dias_sin_pago;
                             $mesesSinPago  = $p->meses_sin_pago;
                             $fechaUltPago  = $p->fecha_ultimo_pago;
                         } else {
                             $ultimoPago    = $p->pagos->sortByDesc('fecha_pago')->first();
-                            $fRef          = $ultimoPago
-                                ? \Carbon\Carbon::parse($ultimoPago->fecha_pago)
-                                : \Carbon\Carbon::parse($p->fecha_prestamo);
+                            $fRef          = $ultimoPago ? \Carbon\Carbon::parse($ultimoPago->fecha_pago) : \Carbon\Carbon::parse($p->fecha_prestamo);
                             $diasSinPago   = (int) $fRef->diffInDays(now());
                             $mesesSinPago  = (int) $fRef->diffInMonths(now());
                             $fechaUltPago  = $ultimoPago ? $ultimoPago->fecha_pago : null;
@@ -108,47 +96,137 @@
                         $saldo = $p->saldo_a_fecha ?? $p->monto;
                         $totalRemate += $saldo;
                         $urgenciaColor = $diasSinPago >= 180 ? '#dc2626' : '#f97316';
+                        $articulosStr = $p->articulos->map(function($a) { return $a->nombre_articulo . ($a->descripcion ? " ({$a->descripcion})" : ""); })->join(' • ');
                     @endphp
                     <tr>
                         <td>{{ $loop->iteration }}</td>
                         <td><strong>{{ $p->codigo }}</strong></td>
-                        <td>{{ $p->cliente->nombre }}</td>
-                        <td style="font-size: 8px; color: #555; max-width: 120px;">
-                            {{ $p->articulos->pluck('nombre')->join(', ') ?: 'Sin artículo' }}
-                        </td>
+                        <td>{{ $p->cliente->nombre ?? 'N/A' }}</td>
+                        <td style="font-size: 8px; color: #555; max-width: 120px;">{{ $articulosStr ?: 'Sin artículo' }}</td>
                         <td>{{ \Carbon\Carbon::parse($p->fecha_prestamo)->format('d/m/Y') }}</td>
                         <td>
-                            @if($fechaUltPago)
-                                {{ \Carbon\Carbon::parse($fechaUltPago)->format('d/m/Y') }}
-                            @else
-                                <span style="color: #dc2626; font-weight: bold;">NINGUNO</span>
-                            @endif
+                            @if($fechaUltPago) {{ \Carbon\Carbon::parse($fechaUltPago)->format('d/m/Y') }}
+                            @else <span style="color: #dc2626; font-weight: bold;">NINGUNO</span> @endif
                         </td>
-                        <td style="text-align: center; color: {{ $urgenciaColor }}; font-weight: bold;">
-                            {{ $diasSinPago }} días
-                        </td>
-                        <td style="text-align: center; color: {{ $urgenciaColor }}; font-weight: bold;">
-                            {{ $mesesSinPago }}m
-                        </td>
-                        <td class="text-right" style="font-weight: bold; color: #dc2626;">
-                            Bs {{ number_format($saldo, 2) }}
-                        </td>
+                        <td style="text-align: center; color: {{ $urgenciaColor }}; font-weight: bold;">{{ $diasSinPago }} días</td>
+                        <td style="text-align: center; color: {{ $urgenciaColor }}; font-weight: bold;">{{ $mesesSinPago }}m</td>
+                        <td class="text-right" style="font-weight: bold; color: #dc2626;">Bs {{ number_format($saldo, 2) }}</td>
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="9" style="text-align: center; padding: 20px; color: #059669; font-weight: bold;">
-                            ✓ ¡Excelente! No hay préstamos en situación de remate.
-                        </td>
+                        <td colspan="9" style="text-align: center; padding: 20px; color: #059669; font-weight: bold;">✓ ¡Excelente! No hay préstamos en situación de remate.</td>
                     </tr>
                 @endforelse
             </tbody>
             @if(count($prestamosRemate) > 0)
             <tfoot>
                 <tr style="background: #fef2f2; border-top: 2px solid #dc2626;">
-                    <td colspan="8" style="font-weight: bold; color: #dc2626; font-size: 10px;">
-                        TOTAL CAPITAL EN RIESGO ({{ count($prestamosRemate) }} préstamos)
+                    <td colspan="8" style="font-weight: bold; color: #dc2626; font-size: 10px;">TOTAL CAPITAL EN RIESGO ({{ count($prestamosRemate) }} préstamos)</td>
+                    <td class="text-right" style="font-weight: bold; color: #dc2626; font-size: 11px;">Bs {{ number_format($totalRemate, 2) }}</td>
+                </tr>
+            </tfoot>
+            @endif
+        </table>
+
+    <!-- 1.B REMATE MODERNO Y DETALLADO -->
+    @elseif($tipo === 'remate')
+        <div class="section-title" style="background: #dc2626;">DETALLE DE PRÉSTAMOS EN REMATE — REPORTE PARA TOMA DE DECISIONES</div>
+        @php 
+            $totalRemate = 0; 
+            $totalMontoInicial = 0;
+        @endphp
+        
+        <table style="width: 100%; border-collapse: collapse; margin-top: 10px; font-family: 'Helvetica', sans-serif;">
+            <thead>
+                <tr style="background: #f87171; color: white;">
+                    <th style="padding: 6px 4px; text-align: center; border: 1px solid #ef4444; font-size: 9px; width: 3%;">#</th>
+                    <th style="padding: 6px 4px; text-align: center; border: 1px solid #ef4444; font-size: 9px; width: 8%;">CÓDIGO</th>
+                    <th style="padding: 6px 4px; text-align: left; border: 1px solid #ef4444; font-size: 9px; width: 18%;">CLIENTE Y CONTACTO</th>
+                    <th style="padding: 6px 4px; text-align: left; border: 1px solid #ef4444; font-size: 9px; width: 25%;">ARTÍCULOS EN GARANTÍA</th>
+                    <th style="padding: 6px 4px; text-align: center; border: 1px solid #ef4444; font-size: 9px; width: 8%;">F. PRÉSTAMO</th>
+                    <th style="padding: 6px 4px; text-align: center; border: 1px solid #ef4444; font-size: 9px; width: 8%;">ÚLTIMO PAGO</th>
+                    <th style="padding: 6px 4px; text-align: center; border: 1px solid #ef4444; font-size: 9px; width: 8%;">INACTIVO</th>
+                    <th style="padding: 6px 4px; text-align: right; border: 1px solid #ef4444; font-size: 9px; width: 10%;">PRÉSTAMO INICIAL</th>
+                    <th style="padding: 6px 4px; text-align: right; border: 1px solid #ef4444; font-size: 9px; width: 12%;">SALDO (EN RIESGO)</th>
+                </tr>
+            </thead>
+            <tbody>
+                @forelse($prestamosRemate as $index => $p)
+                    @php
+                        if (isset($p->dias_sin_pago)) {
+                            $diasSinPago   = $p->dias_sin_pago;
+                            $mesesSinPago  = $p->meses_sin_pago;
+                            $fechaUltPago  = $p->fecha_ultimo_pago;
+                        } else {
+                            $ultimoPago    = $p->pagos->sortByDesc('fecha_pago')->first();
+                            $fRef          = $ultimoPago ? \Carbon\Carbon::parse($ultimoPago->fecha_pago) : \Carbon\Carbon::parse($p->fecha_prestamo);
+                            $diasSinPago   = (int) $fRef->diffInDays(now());
+                            $mesesSinPago  = (int) $fRef->diffInMonths(now());
+                            $fechaUltPago  = $ultimoPago ? $ultimoPago->fecha_pago : null;
+                        }
+                        $saldo = $p->saldo_a_fecha ?? $p->monto;
+                        $monto = $p->monto ?? 0;
+                        $totalRemate += $saldo;
+                        $totalMontoInicial += $monto;
+                        
+                        $urgenciaColor = $diasSinPago >= 180 ? '#991b1b' : '#c2410c'; // Darker text for readability
+                        $urgenciaBg = $diasSinPago >= 180 ? '#fee2e2' : '#ffedd5';
+
+                        $articulosStr = $p->articulos->map(function($a) { return "• " . $a->nombre_articulo . ($a->descripcion ? " <span style='color: #666; font-size: 8px;'>({$a->descripcion})</span>" : ""); })->join('<br>');
+                        $rowColor = $index % 2 === 0 ? '#ffffff' : '#fafafa';
+                    @endphp
+                    <tr style="background: {{ $rowColor }};">
+                        <td style="padding: 6px 4px; text-align: center; border: 1px solid #e5e7eb; font-size: 9px;">{{ $loop->iteration }}</td>
+                        <td style="padding: 6px 4px; text-align: center; border: 1px solid #e5e7eb; font-size: 10px; font-weight: bold; color: #1e3a8a;">
+                            {{ $p->codigo }}
+                        </td>
+                        <td style="padding: 6px 4px; border: 1px solid #e5e7eb;">
+                            <div style="font-size: 10px; font-weight: bold; color: #111827; margin-bottom: 2px;">{{ $p->cliente->nombre ?? 'N/A' }}</div>
+                            <div style="font-size: 8px; color: #4b5563;">CI: {{ $p->cliente->ci ?? 'S/D' }}</div>
+                            <div style="font-size: 8px; color: #047857; font-weight: bold;">Telf: {{ $p->cliente->telefono ?? 'S/D' }}</div>
+                        </td>
+                        <td style="padding: 6px 4px; border: 1px solid #e5e7eb; font-size: 9px; vertical-align: top; line-height: 1.2;">
+                            {!! $articulosStr ?: '<span style="color:#999;">Sin artículo registrado</span>' !!}
+                        </td>
+                        <td style="padding: 6px 4px; text-align: center; border: 1px solid #e5e7eb; font-size: 9px; color: #4b5563;">
+                            {{ \Carbon\Carbon::parse($p->fecha_prestamo)->format('d/m/Y') }}
+                        </td>
+                        <td style="padding: 6px 4px; text-align: center; border: 1px solid #e5e7eb; font-size: 9px;">
+                            @if($fechaUltPago) 
+                                <span style="color: #4b5563;">{{ \Carbon\Carbon::parse($fechaUltPago)->format('d/m/Y') }}</span>
+                            @else 
+                                <span style="color: #dc2626; font-weight: bold; font-size: 8px; background: #fee2e2; padding: 2px 4px; border-radius: 2px;">NINGUNO</span> 
+                            @endif
+                        </td>
+                        <td style="padding: 6px 4px; text-align: center; border: 1px solid #e5e7eb; background: {{ $urgenciaBg }};">
+                            <div style="color: {{ $urgenciaColor }}; font-weight: bold; font-size: 10px;">{{ $diasSinPago }} días</div>
+                            <div style="color: {{ $urgenciaColor }}; font-size: 8px;">({{ $mesesSinPago }} meses)</div>
+                        </td>
+                        <td style="padding: 6px 4px; text-align: right; border: 1px solid #e5e7eb; font-size: 10px; color: #6b7280;">
+                            Bs {{ number_format($monto, 2) }}
+                        </td>
+                        <td style="padding: 6px 4px; text-align: right; border: 1px solid #e5e7eb; font-size: 11px; font-weight: bold; color: #dc2626; background: #fff1f2;">
+                            Bs {{ number_format($saldo, 2) }}
+                        </td>
+                    </tr>
+                @empty
+                    <tr>
+                        <td colspan="9" style="text-align: center; padding: 30px; color: #059669; font-weight: bold; font-size: 12px; border: 1px solid #e5e7eb;">
+                            ✓ ¡Excelente! No hay préstamos en situación de remate al corte.
+                        </td>
+                    </tr>
+                @endforelse
+            </tbody>
+            @if(count($prestamosRemate) > 0)
+            <tfoot>
+                <tr>
+                    <td colspan="7" style="padding: 8px; text-align: right; font-weight: bold; color: #dc2626; font-size: 11px; border: 1px solid #e5e7eb; background: #fee2e2;">
+                        TOTALES DE {{ count($prestamosRemate) }} PRÉSTAMOS EN REMATE:
                     </td>
-                    <td class="text-right" style="font-weight: bold; color: #dc2626; font-size: 11px;">
+                    <td style="padding: 8px; text-align: right; font-weight: bold; color: #6b7280; font-size: 11px; border: 1px solid #e5e7eb; background: #f3f4f6;">
+                        Bs {{ number_format($totalMontoInicial, 2) }}
+                    </td>
+                    <td style="padding: 8px; text-align: right; font-weight: bold; color: #dc2626; font-size: 13px; border: 1px solid #e5e7eb; background: #fee2e2;">
                         Bs {{ number_format($totalRemate, 2) }}
                     </td>
                 </tr>

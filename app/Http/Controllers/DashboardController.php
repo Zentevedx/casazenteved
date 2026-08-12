@@ -3,110 +3,100 @@
 namespace App\Http\Controllers;
 
 use App\Models\Prestamo;
+use App\Services\AgingService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Carbon\Carbon;
 
 class DashboardController extends Controller
 {
+    public function __construct(
+        private AgingService $agingService
+    ) {}
+
     public function index(Request $request) 
     {
-        // 1. VERIFICACIÓN AUTOMÁTICA (Reglas de Negocio)
-        $prestamosParaVerificar = Prestamo::where('estado', 'Activo')->with('pagos')->get();
+        // 1. VERIFICACIÓN AUTOMÁTICA usando AgingService
+        $prestamosParaVerificar = Prestamo::whereIn('estado', ['Activo', 'Vencido'])->with(['pagos', 'cliente'])->get();
         
         foreach ($prestamosParaVerificar as $prestamo) {
-            // REGLA 1: El Capital MATA el préstamo (lo paga)
-            $totalCapitalPagado = $prestamo->pagos
-                ->where('tipo_pago', 'Capital')
-                ->sum('monto_pagado'); 
-
-            // Si pagó el capital completo (con margen de error de 0.10 ctvs)
-            if ($totalCapitalPagado >= ($prestamo->monto - 0.1)) {
+            // REGLA 1: Capital completo pagado = cerrar préstamo
+            if ($this->agingService->isCapitalFullyPaid($prestamo)) {
                 $prestamo->update(['estado' => 'Pagado']);
-                continue; // Se cerró, pasamos al siguiente
+                $prestamo->articulos()->update(['estado' => 'Retirado']);
+                continue;
             }
 
-            // REGLA 2: Solo el INTERÉS da vida (reinicia el contador)
-            $ultimoPagoInteres = $prestamo->pagos
-                ->where('tipo_pago', 'Interes')
-                ->sortByDesc('fecha_pago')
-                ->first();
-
-            // La fecha base es el último interés pagado O la fecha original del préstamo
-            $fechaReferencia = $ultimoPagoInteres 
-                ? Carbon::parse($ultimoPagoInteres->fecha_pago) 
-                : Carbon::parse($prestamo->fecha_prestamo);
-
-            // Si pasaron 3 meses desde esa fecha sin nuevo interés -> VENCIDO
-            if ($fechaReferencia->diffInMonths(Carbon::now()) >= 3) {
+            // REGLA 2: Más de 90 días de retraso = Vencido
+            $diasRetraso = $this->agingService->getDaysOverdue($prestamo);
+            if ($diasRetraso >= 90 && $prestamo->estado !== 'Vencido') {
                 $prestamo->update(['estado' => 'Vencido']);
             }
         }
 
         // 2. PREPARACIÓN DE DATOS PARA LA VISTA
-        $estadoFiltro = $request->input('estado', 'Activo'); 
-        $query = Prestamo::with(['cliente', 'pagos', 'articulos']);
-
-        if ($estadoFiltro !== 'Todos') {
-            if ($estadoFiltro === 'mora_critica') {
-                $query->where('estado', '!=', 'Pagado')
-                      ->where(function($q) {
-                          $q->where('estado', 'Vencido')
-                            ->orWhereDate('fecha_prestamo', '<', Carbon::now()->subDays(90));
-                      });
-            } elseif ($estadoFiltro === 'por_vencer') {
-                $query->where('estado', 'Activo')
-                      ->where(function($masterQ) {
-                          $masterQ->whereHas('pagos', function($q) {
-                               $q->select('prestamo_id')->groupBy('prestamo_id')
-                                 ->havingRaw('MAX(fecha_pago) < ?', [Carbon::now()->subDays(25)]);
-                          })->orWhereDoesntHave('pagos', function($q) {
-                               $q->whereDate('fecha_prestamo', '<', Carbon::now()->subDays(25));
-                          });
-                      });
-            } else {
-                // Filtro normal (Activo, Pagado, Vencido)
-                $query->where('estado', $estadoFiltro);
-            }
-        }
-
-        $prestamos = $query->get();
-        $prestamosProcesados = [];
+        $estadoFiltro = $request->input('estado', 'todos_pendientes'); 
         
-        // Variables para KPIs globales
+        // Cargamos TODOS los préstamos y los filtramos en PHP usando AgingService
+        // para tener datos consistentes (no filtrar por estado DB para categorías custom)
+        $allPrestamos = Prestamo::with(['cliente', 'pagos', 'articulos'])->get();
+        
+        // Procesar todos y aplicar aging para filtrado
+        $prestamosProcesados = [];
         $totalPrestado = 0;
         $totalCapitalRecuperado = 0;
         $totalInteresesGenerados = 0;
-        $prestamosEnMora = 0; 
+        $prestamosEnMora = 0;
 
-        foreach ($prestamos as $prestamo) {
-            // Filtrar pagos
-            $pagosInteres = $prestamo->pagos->where('tipo_pago', 'Interes');
-            $pagosCapital = $prestamo->pagos->where('tipo_pago', 'Capital');
-            
-            $capitalRecuperado = $pagosCapital->sum('monto_pagado');
-            $interesesGenerados = $pagosInteres->sum('monto_pagado');
-            
-            // Lógica de fechas
-            $numPagosInteres = $pagosInteres->count();
-            $fechaBase = Carbon::parse($prestamo->fecha_prestamo);
-            
-            // Calculamos la próxima fecha de pago basada en cuántos meses de interés ha pagado
-            $fechaReferenciaProximo = $fechaBase->copy()->addMonths($numPagosInteres);
-            $fechaProximoPago = $fechaReferenciaProximo->copy()->addMonth();
+        foreach ($allPrestamos as $prestamo) {
+            $aging = $this->agingService->getAgingData($prestamo);
 
-            // Determinamos si está en mora técnica (incluso si está "Activo")
-            $estaEnMora = $prestamo->estado === 'Vencido' || 
-                          ($prestamo->estado === 'Activo' && $fechaProximoPago->lt(Carbon::now()->startOfDay()));
+            // Aplicar filtros basados en categoría de aging
+            $incluir = false;
+            switch ($estadoFiltro) {
+                case 'todos_pendientes':
+                    $incluir = $prestamo->estado !== 'Pagado';
+                    break;
+                case 'al_dia':
+                    $incluir = $aging['categoria_aging'] === 'verde' && $prestamo->estado !== 'Pagado';
+                    break;
+                case 'riesgo_leve':
+                    $incluir = $aging['categoria_aging'] === 'amarillo';
+                    break;
+                case 'riesgo_alto':
+                    $incluir = $aging['categoria_aging'] === 'rojo';
+                    break;
+                case 'remate':
+                    $incluir = $aging['categoria_aging'] === 'remate';
+                    break;
+                case 'Activo':
+                    $incluir = $prestamo->estado === 'Activo';
+                    break;
+                case 'Vencido':
+                    $incluir = $prestamo->estado === 'Vencido';
+                    break;
+                case 'Pagado':
+                    $incluir = $prestamo->estado === 'Pagado';
+                    break;
+                default:
+                    $incluir = true;
+            }
+
+            if (!$incluir) continue;
+
+            // Usar AgingService para cálculos unificados (ya calculado arriba)
             
-            // Acumuladores globales
+            $capitalRecuperado = $prestamo->pagos->where('tipo_pago', 'Capital')->sum('monto_pagado');
+            $interesesGenerados = $prestamo->pagos->where('tipo_pago', 'Interes')->sum('monto_pagado');
+            
+            $estaEnMora = $aging['dias_retraso'] > 0;
+            
             $totalPrestado += $prestamo->monto;
             $totalCapitalRecuperado += $capitalRecuperado;
             $totalInteresesGenerados += $interesesGenerados;
             if ($estaEnMora) $prestamosEnMora++;
 
-            // Formatear Historial de Intereses para el frontend
-            $historialIntereses = $pagosInteres->sortByDesc('fecha_pago')->map(function($pago) {
+            $historialIntereses = $prestamo->pagos->where('tipo_pago', 'Interes')->sortByDesc('fecha_pago')->map(function($pago) {
                 return [
                     'id' => $pago->id,
                     'fecha' => Carbon::parse($pago->fecha_pago)->format('d/m/Y'),
@@ -114,30 +104,35 @@ class DashboardController extends Controller
                 ];
             })->values();
 
-            // Formatear Lista de Artículos para el frontend
             $listaArticulos = $prestamo->articulos->map(function($art) {
                 return [
+                    'id'     => $art->id,
                     'nombre' => $art->nombre_articulo,
-                    'detalle' => $art->descripcion . ($art->marca ? ' - ' . $art->marca : '') . ($art->modelo ? ' (' . $art->modelo . ')' : ''),
+                    'detalle' => $art->descripcion ?? '',
+                    'foto'   => $art->foto_url,
+                    'estado' => $art->estado,
                 ];
             });
 
-            // Construcción del objeto final
             $prestamosProcesados[] = [
-                'id' => $prestamo->id,
-                'codigo' => $prestamo->codigo,
-                'monto' => $prestamo->monto,
-                'estado' => $prestamo->estado, 
-                'cliente_nombre' => $prestamo->cliente->nombre ?? 'Desconocido',
-                'cliente_id' => $prestamo->cliente->id ?? null,
-                'fecha_prestamo' => $fechaBase->toDateString(), 
-                'fecha_proximo_pago' => $fechaProximoPago->toDateString(),
-                'capital_recuperado' => $capitalRecuperado,
-                'intereses_generados' => $interesesGenerados,
-                'esta_en_mora' => $estaEnMora,
-                'meses_atraso' => $fechaReferenciaProximo->floatDiffInMonths(Carbon::now(), false), // Calculate lag from theoretical paid-up date
-                'historial_intereses' => $historialIntereses,
-                'articulos' => $listaArticulos,
+                'id'                   => $prestamo->id,
+                'codigo'               => $prestamo->codigo,
+                'monto'                => $prestamo->monto,
+                'estado'               => $prestamo->estado, 
+                'cliente_nombre'       => $prestamo->cliente->nombre ?? 'Desconocido',
+                'cliente_id'           => $prestamo->cliente->id ?? null,
+                'fecha_prestamo'       => $prestamo->fecha_prestamo,
+                'fecha_vencimiento'    => $aging['fecha_vencimiento'],
+                'fecha_al_dia'         => $aging['fecha_al_dia'],
+                'capital_recuperado'   => $capitalRecuperado,
+                'intereses_generados'  => $interesesGenerados,
+                'esta_en_mora'         => $estaEnMora,
+                'dias_retraso'         => $aging['dias_retraso'],
+                'meses_retraso'        => $aging['meses_retraso'],
+                'categoria_aging'      => $aging['categoria_aging'],
+                'saldo_pendiente'      => $aging['saldo_pendiente'],
+                'historial_intereses'  => $historialIntereses,
+                'articulos'            => $listaArticulos,
             ];
         }
         
@@ -176,9 +171,10 @@ class DashboardController extends Controller
                     ],
                     'contadores' => [
                         'total'    => $prestamosDelMes->count(),
-                        'verde'    => $prestamosDelMes->filter(fn($p) => $p['estado'] !== 'Pagado' && $p['meses_atraso'] < 1)->count(),
-                        'amarillo' => $prestamosDelMes->filter(fn($p) => $p['estado'] !== 'Pagado' && $p['meses_atraso'] >= 1 && $p['meses_atraso'] < 3)->count(),
-                        'rojo'     => $prestamosDelMes->filter(fn($p) => $p['estado'] !== 'Pagado' && $p['meses_atraso'] >= 3)->count(),
+                        'verde'    => $prestamosDelMes->filter(fn($p) => $p['categoria_aging'] === 'verde' && $p['estado'] !== 'Pagado')->count(),
+                        'amarillo' => $prestamosDelMes->filter(fn($p) => $p['categoria_aging'] === 'amarillo')->count(),
+                        'rojo'     => $prestamosDelMes->filter(fn($p) => $p['categoria_aging'] === 'rojo')->count(),
+                        'remate'   => $prestamosDelMes->filter(fn($p) => $p['categoria_aging'] === 'remate')->count(),
                         'pagado'   => $prestamosDelMes->filter(fn($p) => $p['estado'] === 'Pagado')->count(),
                     ]
                 ];

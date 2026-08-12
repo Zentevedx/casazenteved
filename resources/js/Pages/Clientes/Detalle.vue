@@ -48,49 +48,13 @@ const volverALista = () => {
     mobileView.value = 'list';
 };
 
-// --- CÁLCULO INTELIGENTE DE RETRASO ---
+// --- RETRASO: AHORA USA DATOS DEL BACKEND (AgingService) ---
 const calcularRetraso = (prestamo) => {
-    if (!['Activo', 'Vencido'].includes(prestamo.estado)) return null;
-
-    const pagosInteres = prestamo.pagos.filter(p => p.tipo_pago === 'Interes').length;
-    const fechaBase = new Date(prestamo.fecha_prestamo + 'T00:00:00');
-    const fechaVencimiento = new Date(fechaBase);
-
-    fechaVencimiento.setMonth(fechaBase.getMonth() + pagosInteres + 1);
-
-    if (fechaVencimiento.getDate() !== fechaBase.getDate()) {
-        fechaVencimiento.setDate(0);
+    // Usar el texto de retraso calculado por el backend (AgingService)
+    if (prestamo.aging && prestamo.aging.dias_retraso > 0) {
+        return prestamo.retraso_texto;
     }
-
-    const hoy = new Date();
-    hoy.setHours(0, 0, 0, 0);
-    fechaVencimiento.setHours(0, 0, 0, 0);
-
-    if (hoy <= fechaVencimiento) return null;
-
-    let meses = 0;
-
-    let tempDate = new Date(fechaVencimiento);
-
-    while (true) {
-        const siguienteMes = new Date(tempDate);
-        siguienteMes.setMonth(siguienteMes.getMonth() + 1);
-        if (siguienteMes.getDate() !== tempDate.getDate()) {
-            siguienteMes.setDate(0);
-        }
-        if (siguienteMes > hoy) break;
-        tempDate = siguienteMes;
-        meses++;
-    }
-
-    const diffTime = Math.abs(hoy - tempDate);
-    const dias = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-    let texto = [];
-    if (meses > 0) texto.push(`${meses} ${meses === 1 ? 'mes' : 'meses'}`);
-    if (dias > 0) texto.push(`${dias} ${dias === 1 ? 'día' : 'días'}`);
-
-    return texto.length > 0 ? texto.join(' y ') + ' de retraso' : 'Vence hoy';
+    return null;
 };
 
 // Avatar logic migrated to Avatar component

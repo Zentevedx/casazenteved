@@ -4,12 +4,14 @@ namespace App\Http\Controllers;
 
 use App\Models\Prestamo;
 use App\Models\Articulo;
-use App\Models\Caja; // <--- IMPORTANTE: Modelo Caja importado
+use App\Models\Caja;
 use App\Models\Cliente;
 use App\Services\PrestamoService;
+use App\Services\AgingService;
 use Illuminate\Http\Request;
 use Spatie\Browsershot\Browsershot;
 use Inertia\Inertia;
+use Carbon\Carbon;
 
 class PrestamoController extends Controller
 {
@@ -135,5 +137,64 @@ class PrestamoController extends Controller
         $this->prestamoService->actualizarEstado($prestamo, $request->estado);
 
         return back()->with('success', 'Estado del préstamo actualizado correctamente.');
+    }
+
+    /**
+     * Vista de préstamos agrupados por rango de mora.
+     * Rangos: 0-30, 31-60, 61-90, 90+ días de retraso.
+     */
+    public function porMora(Request $request, AgingService $agingService, ?string $rango = null)
+    {
+        $rango = $request->route('rango') ?? $rango ?? 'todas';
+        
+        $prestamos = Prestamo::with(['cliente', 'pagos', 'articulos'])
+            ->whereIn('estado', ['Activo', 'Vencido'])
+            ->get();
+        
+        // Procesar con AgingService
+        $procesados = $prestamos->map(function ($p) use ($agingService) {
+            $aging = $agingService->getAgingData($p);
+            $p->aging = $aging;
+            return $p;
+        });
+
+        // Filtrar por rango
+        $filtrados = $procesados->filter(function ($p) use ($rango) {
+            $dias = $p->aging['dias_retraso'];
+            switch ($rango) {
+                case '0-30':  return $dias >= 0 && $dias <= 30;
+                case '31-60': return $dias >= 31 && $dias <= 60;
+                case '61-90': return $dias >= 61 && $dias <= 90;
+                case '90+':   return $dias > 90;
+                case 'todas': return $dias > 0; // Solo las que tienen retraso
+                default:      return true;
+            }
+        })->values();
+
+        // Contadores por rango
+        $conteos = [
+            ['rango' => '0-30',  'label' => 'Al día',         'count' => $procesados->filter(fn($p) => $p->aging['dias_retraso'] >= 0 && $p->aging['dias_retraso'] <= 30)->count(), 'monto' => $procesados->filter(fn($p) => $p->aging['dias_retraso'] >= 0 && $p->aging['dias_retraso'] <= 30)->sum(fn($p) => $p->aging['saldo_pendiente'])],
+            ['rango' => '31-60', 'label' => 'Riesgo Leve',    'count' => $procesados->filter(fn($p) => $p->aging['dias_retraso'] >= 31 && $p->aging['dias_retraso'] <= 60)->count(), 'monto' => $procesados->filter(fn($p) => $p->aging['dias_retraso'] >= 31 && $p->aging['dias_retraso'] <= 60)->sum(fn($p) => $p->aging['saldo_pendiente'])],
+            ['rango' => '61-90', 'label' => 'Riesgo Alto',    'count' => $procesados->filter(fn($p) => $p->aging['dias_retraso'] >= 61 && $p->aging['dias_retraso'] <= 90)->count(), 'monto' => $procesados->filter(fn($p) => $p->aging['dias_retraso'] >= 61 && $p->aging['dias_retraso'] <= 90)->sum(fn($p) => $p->aging['saldo_pendiente'])],
+            ['rango' => '90+',   'label' => 'En Remate',      'count' => $procesados->filter(fn($p) => $p->aging['dias_retraso'] > 90)->count(), 'monto' => $procesados->filter(fn($p) => $p->aging['dias_retraso'] > 90)->sum(fn($p) => $p->aging['saldo_pendiente'])],
+        ];
+
+        // KPIs
+        $totalPendiente = $procesados->sum(fn($p) => $p->aging['saldo_pendiente']);
+        $totalInteresesGenerados = $procesados->sum(fn($p) => $p->pagos->where('tipo_pago', 'Interes')->sum('monto_pagado'));
+        $promedioRetraso = $filtrados->avg(fn($p) => $p->aging['dias_retraso']) ?? 0;
+
+        return Inertia::render('Prestamos/PorMora', [
+            'prestamos' => $filtrados,
+            'conteos' => $conteos,
+            'rangoActual' => $rango,
+            'kpis' => [
+                'total_pendiente' => $totalPendiente,
+                'total_intereses' => $totalInteresesGenerados,
+                'prestamos_en_mora' => $procesados->filter(fn($p) => $p->aging['dias_retraso'] > 30)->count(),
+                'promedio_retraso' => round($promedioRetraso, 1),
+                'cartera_total' => $procesados->sum('monto'),
+            ],
+        ]);
     }
 }

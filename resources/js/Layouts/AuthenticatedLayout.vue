@@ -24,7 +24,8 @@ import {
     ChevronRightIcon,
     CheckCircleIcon,
     XCircleIcon,
-    XMarkIcon
+    XMarkIcon,
+    ExclamationTriangleIcon
 } from '@heroicons/vue/24/outline';
 
 const showingNavigationDropdown = ref(false);
@@ -152,10 +153,19 @@ watch([flashSuccess, flashError], () => {
                         Clientes
                     </span>
                 </NavLink>
-                <NavLink :href="route('prestamos.index')" :active="route().current('prestamos.*')" :class="{'justify-center': isSidebarCollapsed}" :title="isSidebarCollapsed ? 'Préstamos' : ''">
+                <NavLink :href="route('prestamos.index')" :active="route().current('prestamos.index') && !route().current('prestamos.porMora*')" :class="{'justify-center': isSidebarCollapsed}" :title="isSidebarCollapsed ? 'Préstamos' : ''">
                     <DocumentTextIcon class="w-5 h-5 shrink-0" />
                     <span class="transition-all duration-300 overflow-hidden whitespace-nowrap" :class="[isSidebarCollapsed ? 'w-0 opacity-0 ml-0' : 'w-auto opacity-100 ml-3']">
                         Préstamos
+                    </span>
+                </NavLink>
+                <NavLink :href="route('prestamos.porMora')" :active="route().current('prestamos.porMora*')" :class="{'justify-center': isSidebarCollapsed}" :title="isSidebarCollapsed ? 'Mora' : ''">
+                    <ExclamationTriangleIcon class="w-5 h-5 shrink-0 text-orange-500" />
+                    <span class="transition-all duration-300 overflow-hidden whitespace-nowrap" :class="[isSidebarCollapsed ? 'w-0 opacity-0 ml-0' : 'w-auto opacity-100 ml-3']">
+                        <span class="flex items-center gap-2">
+                            Control de Mora
+                            <span class="ml-auto bg-orange-500/10 text-orange-500 text-[10px] font-bold px-1.5 py-0.5 rounded-full">NUEVO</span>
+                        </span>
                     </span>
                 </NavLink>
                 <NavLink :href="route('articulos.index')" :active="route().current('articulos.*')" :class="{'justify-center': isSidebarCollapsed}" :title="isSidebarCollapsed ? 'Artículos' : ''">
@@ -334,8 +344,11 @@ watch([flashSuccess, flashError], () => {
                 <ResponsiveNavLink :href="route('clientes.index')" :active="route().current('clientes.*')">
                     Clientes
                 </ResponsiveNavLink>
-                <ResponsiveNavLink :href="route('prestamos.index')" :active="route().current('prestamos.*')">
+                <ResponsiveNavLink :href="route('prestamos.index')" :active="route().current('prestamos.index')">
                     Préstamos
+                </ResponsiveNavLink>
+                <ResponsiveNavLink :href="route('prestamos.porMora')" :active="route().current('prestamos.porMora*')">
+                    🔴 Control de Mora
                 </ResponsiveNavLink>
                 <ResponsiveNavLink :href="route('articulos.index')" :active="route().current('articulos.*')">
                     Artículos

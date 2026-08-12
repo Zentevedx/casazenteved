@@ -114,14 +114,20 @@
                 <td style="font-weight: bold;">#</td>
                 <td style="font-weight: bold;">CÓDIGO</td>
                 <td style="font-weight: bold;">CLIENTE</td>
-                <td style="font-weight: bold;">ARTÍCULO(S)</td>
-                <td style="font-weight: bold;">FECHA INICIO</td>
+                <td style="font-weight: bold;">CI</td>
+                <td style="font-weight: bold;">TELÉFONO</td>
+                <td style="font-weight: bold;">ARTÍCULOS EN GARANTÍA</td>
+                <td style="font-weight: bold;">F. PRÉSTAMO</td>
                 <td style="font-weight: bold;">ÚLTIMO PAGO</td>
                 <td style="font-weight: bold;">DÍAS INACTIVO</td>
                 <td style="font-weight: bold;">MESES</td>
-                <td style="font-weight: bold;">CAPITAL EN RIESGO (Bs)</td>
+                <td style="font-weight: bold;">PRÉSTAMO INICIAL (Bs)</td>
+                <td style="font-weight: bold;">SALDO EN RIESGO (Bs)</td>
             </tr>
-            @php $totalRemate = 0; @endphp
+            @php 
+                $totalRemate = 0; 
+                $totalMontoInicial = 0;
+            @endphp
             @forelse($prestamosRemate as $p)
                 @php
                     if (isset($p->dias_sin_pago)) {
@@ -136,25 +142,34 @@
                         $fechaUlt     = $ultP ? $ultP->fecha_pago : null;
                     }
                     $saldo = $p->saldo_a_fecha ?? $p->monto;
+                    $monto = $p->monto ?? 0;
                     $totalRemate += $saldo;
+                    $totalMontoInicial += $monto;
+                    $articulosStr = collect($p->articulos)->map(function($a) { 
+                        return ($a->nombre_articulo ?? '') . (!empty($a->descripcion) ? " ({$a->descripcion})" : ""); 
+                    })->join(' • ');
                 @endphp
                 <tr>
                     <td>{{ $loop->iteration }}</td>
                     <td>{{ $p->codigo }}</td>
-                    <td>{{ $p->cliente->nombre }}</td>
-                    <td>{{ $p->articulos->pluck('nombre')->join(', ') ?: 'Sin artículo' }}</td>
+                    <td>{{ $p->cliente->nombre ?? 'N/A' }}</td>
+                    <td>{{ $p->cliente->ci ?? 'N/A' }}</td>
+                    <td>{{ $p->cliente->telefono ?? 'N/A' }}</td>
+                    <td>{{ $articulosStr ?: 'Sin artículo' }}</td>
                     <td>{{ \Carbon\Carbon::parse($p->fecha_prestamo)->format('Y-m-d') }}</td>
                     <td>{{ $fechaUlt ? \Carbon\Carbon::parse($fechaUlt)->format('Y-m-d') : 'NINGUNO' }}</td>
                     <td>{{ $diasSinPago }}</td>
                     <td>{{ $mesesSinPago }}</td>
+                    <td>{{ number_format($monto, 2) }}</td>
                     <td>{{ number_format($saldo, 2) }}</td>
                 </tr>
             @empty
-                <tr><td colspan="9">Sin préstamos en remate</td></tr>
+                <tr><td colspan="12">Sin préstamos en remate</td></tr>
             @endforelse
             {{-- Fila de total --}}
             <tr>
-                <td style="font-weight: bold;" colspan="8">TOTAL CAPITAL EN RIESGO</td>
+                <td style="font-weight: bold; text-align: right;" colspan="10">TOTALES:</td>
+                <td style="font-weight: bold;">{{ number_format($totalMontoInicial, 2) }}</td>
                 <td style="font-weight: bold;">{{ number_format($totalRemate, 2) }}</td>
             </tr>
         @endif

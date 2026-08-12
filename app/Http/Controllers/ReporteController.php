@@ -2,6 +2,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Prestamo;
+use App\Services\AgingService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Carbon\Carbon;
@@ -9,6 +10,10 @@ use Carbon\CarbonPeriod;
 
 class ReporteController extends Controller
 {
+    public function __construct(
+        private AgingService $agingService
+    ) {}
+
     public function reporteFinanciero(Request $request)
     {
         $modo = $request->input('modo', 'mensual'); // mensual, semanal, global
@@ -57,52 +62,30 @@ class ReporteController extends Controller
         $listaCapital = $capitalQuery->get();
         $capitalRecuperado = $listaCapital->sum('monto_pagado');
 
-        // 5. CÁLCULO DE CARTERA (HISTÓRICO / "TIME TRAVEL")
-        // No depender del estado actual, sino recalcular el saldo a la fecha de corte ($to)
+                // 5. CÁLCULO DE CARTERA (HISTÓRICO / "TIME TRAVEL") usando AgingService
+        $fechaCorte = $to->isFuture() ? now() : $to->copy();
         
-        // Obtener todos los préstamos creados hasta el final del periodo seleccionado
         $carteraTotalQuery = Prestamo::with(['cliente', 'pagos', 'articulos'])
-            ->where('fecha_prestamo', '<=', $to)
+            ->where('fecha_prestamo', '<=', $fechaCorte)
             ->get();
             
-        // Filtrar aquellos que tenían saldo pendiente a la fecha de corte
-        $loansActiveAtDate = $carteraTotalQuery->filter(function ($p) use ($to) {
-            $capitalPagadoHastaFecha = $p->pagos
-                ->where('tipo_pago', 'Capital')
-                ->where('fecha_pago', '<=', $to)
-                ->sum('monto_pagado');
-            
-            // Calculamos el saldo a esa fecha
-            $p->saldo_a_fecha = $p->monto - $capitalPagadoHastaFecha;
-            
-            // Si debía algo (más de 1 Bs para evitar decimales residuales), estaba activo
+        $loansActiveAtDate = $carteraTotalQuery->filter(function ($p) use ($fechaCorte) {
+            $aging = $this->agingService->getAgingData($p, $fechaCorte);
+            $p->saldo_a_fecha = $aging['saldo_pendiente'];
+            $p->aging_data = $aging;
             return $p->saldo_a_fecha > 1;
         });
 
-        // La Cartera Total es la suma del Saldo Pendiente real en ese momento (Dinero en calle)
-        // Opcional: Si prefieres sumar el Monto Original de los activos, usa $p->monto. 
-        // Para "Dinero no en mis manos", saldo_a_fecha es lo más preciso.
         $carteraTotal = $loansActiveAtDate->sum('saldo_a_fecha');
         
-        // Filtrar Remate (Riesgo) usando la fecha de corte como referencia
-        $prestamosRemate = $loansActiveAtDate->filter(function ($p) use ($to) {
-            $ultimoPago = $p->pagos
-                ->where('fecha_pago', '<=', $to)
-                ->sortByDesc('fecha_pago')
-                ->first();
+        // Filtrar Remate usando AgingService (>= 3 meses de retraso = remate)
+        $prestamosRemate = $loansActiveAtDate->filter(function ($p) use ($fechaCorte) {
+            $mesesRetraso = $this->agingService->getMonthsOverdue($p, $fechaCorte);
+            if ($mesesRetraso < 3) return false;
 
-            $fechaReferencia = $ultimoPago
-                ? Carbon::parse($ultimoPago->fecha_pago)
-                : Carbon::parse($p->fecha_prestamo);
-
-            $mesesSinPago = (int) $fechaReferencia->diffInMonths($to);
-
-            if ($mesesSinPago < 3) return false;
-
-            // Enriquecer con campos calculados para el frontend
-            $p->fecha_ultimo_pago   = $ultimoPago ? $ultimoPago->fecha_pago : null;
-            $p->dias_sin_pago       = (int) $fechaReferencia->diffInDays($to);
-            $p->meses_sin_pago      = $mesesSinPago;
+            $p->fecha_ultimo_pago   = $p->aging_data['ultimo_pago_fecha'];
+            $p->dias_sin_pago       = $p->aging_data['dias_retraso'];
+            $p->meses_sin_pago      = $mesesRetraso;
             $p->cliente_id_ref      = $p->cliente->id ?? null;
 
             return true;
@@ -113,47 +96,28 @@ class ReporteController extends Controller
 
         // 6. SALUD DE CARTERA — Aging + Eficiencia de Cobranza + Alertas Tempranas
         $aging = [
-            'al_dia'      => ['count' => 0, 'monto' => 0],
-            'riesgo_leve' => ['count' => 0, 'monto' => 0], // 31-60 días
-            'riesgo_alto' => ['count' => 0, 'monto' => 0], // 61-89 días
-            'remate'      => ['count' => 0, 'monto' => 0], // >= 90 días
+            'al_dia'      => ['count' => 0, 'monto' => 0],   // 0-30 días retraso
+            'riesgo_leve' => ['count' => 0, 'monto' => 0],   // 31-60 días
+            'riesgo_alto' => ['count' => 0, 'monto' => 0],   // 61-89 días
+            'remate'      => ['count' => 0, 'monto' => 0],   // >= 90 días
         ];
         $alertas = [];
 
         foreach ($loansActiveAtDate as $p) {
-            $ultimoPago = $p->pagos->where('fecha_pago', '<=', $to)->sortByDesc('fecha_pago')->first();
-            $fechaRef   = $ultimoPago ? Carbon::parse($ultimoPago->fecha_pago) : Carbon::parse($p->fecha_prestamo);
-            $diasSinMov = (int) $fechaRef->diffInDays(now());
+            $diasRetraso = $p->aging_data['dias_retraso'];
+            $categoria = $p->aging_data['categoria_aging'];
 
-            if ($diasSinMov <= 30) {
+            if ($categoria === 'verde') {
                 $aging['al_dia']['count']++;
                 $aging['al_dia']['monto'] += $p->saldo_a_fecha;
-            } elseif ($diasSinMov <= 60) {
+            } elseif ($categoria === 'amarillo') {
                 $aging['riesgo_leve']['count']++;
                 $aging['riesgo_leve']['monto'] += $p->saldo_a_fecha;
-                $alertas[] = [
-                    'id'            => $p->id,
-                    'codigo'        => $p->codigo,
-                    'cliente_id'    => $p->cliente->id ?? null,
-                    'cliente'       => $p->cliente->nombre ?? 'N/A',
-                    'telefono'      => $p->cliente->telefono ?? null,
-                    'monto'         => $p->saldo_a_fecha,
-                    'dias_sin_pago' => $diasSinMov,
-                    'nivel'         => 'leve',
-                ];
-            } elseif ($diasSinMov <= 89) {
+                $alertas[] = $this->crearAlerta($p, 'leve');
+            } elseif ($categoria === 'rojo') {
                 $aging['riesgo_alto']['count']++;
                 $aging['riesgo_alto']['monto'] += $p->saldo_a_fecha;
-                $alertas[] = [
-                    'id'            => $p->id,
-                    'codigo'        => $p->codigo,
-                    'cliente_id'    => $p->cliente->id ?? null,
-                    'cliente'       => $p->cliente->nombre ?? 'N/A',
-                    'telefono'      => $p->cliente->telefono ?? null,
-                    'monto'         => $p->saldo_a_fecha,
-                    'dias_sin_pago' => $diasSinMov,
-                    'nivel'         => 'alto',
-                ];
+                $alertas[] = $this->crearAlerta($p, 'alto');
             } else {
                 $aging['remate']['count']++;
                 $aging['remate']['monto'] += $p->saldo_a_fecha;
@@ -166,7 +130,6 @@ class ReporteController extends Controller
             ? round(($interesesDelMes / $interesProyectado) * 100, 1)
             : 0;
 
-        // Ordenar alertas: primero los más urgentes (mayor días sin pago)
         usort($alertas, fn($a, $b) => $b['dias_sin_pago'] - $a['dias_sin_pago']);
 
         return Inertia::render('Reportes/Financiero', [
@@ -201,6 +164,24 @@ class ReporteController extends Controller
                 'periodoLabel' => $periodoLabel,
             ]
         ]);
+    }
+
+    /**
+     * Helper para crear alerta temprana
+     */
+    private function crearAlerta($p, string $nivel): array
+    {
+        return [
+            'id'            => $p->id,
+            'codigo'        => $p->codigo,
+            'cliente_id'    => $p->cliente->id ?? null,
+            'cliente'       => $p->cliente->nombre ?? 'N/A',
+            'telefono'      => $p->cliente->telefono ?? null,
+            'monto'         => $p->saldo_a_fecha,
+            'dias_sin_pago' => $p->aging_data['dias_retraso'] ?? 0,
+            'nivel'         => $nivel,
+            'meses_retraso' => $p->aging_data['meses_retraso'] ?? 0,
+        ];
     }
 
     public function generarPdfFinanciero(Request $request)
@@ -258,18 +239,19 @@ class ReporteController extends Controller
         $data['capital_recuperado'] = $listaCapital->sum('monto_pagado');
 
         // 5. CÁLCULO DE CARTERA (HISTÓRICO / "TIME TRAVEL")
-        // No depender del estado actual, sino recalcular el saldo a la fecha de corte ($to)
+        // Definir la fecha de corte exacta: si el periodo aún no termina (ej. fin de mes actual), cortar hoy.
+        $fechaCorte = $to->isFuture() ? now() : $to->copy();
         
         // Obtener todos los préstamos creados hasta el final del periodo seleccionado
         $carteraTotalQuery = Prestamo::with(['cliente', 'pagos', 'articulos'])
-            ->where('fecha_prestamo', '<=', $to)
+            ->where('fecha_prestamo', '<=', $fechaCorte)
             ->get();
             
         // Filtrar aquellos que tenían saldo pendiente a la fecha de corte
-        $loansActiveAtDate = $carteraTotalQuery->filter(function ($p) use ($to) {
+        $loansActiveAtDate = $carteraTotalQuery->filter(function ($p) use ($fechaCorte) {
             $capitalPagadoHastaFecha = $p->pagos
                 ->where('tipo_pago', 'Capital')
-                ->where('fecha_pago', '<=', $to)
+                ->where('fecha_pago', '<=', $fechaCorte)
                 ->sum('monto_pagado');
             
             // Calculamos el saldo a esa fecha
@@ -283,19 +265,27 @@ class ReporteController extends Controller
         $carteraTotal = $loansActiveAtDate->sum('saldo_a_fecha');
         
         // Filtrar Remate (Riesgo) usando la fecha de corte como referencia
-        $prestamosRemate = $loansActiveAtDate->filter(function ($p) use ($to) {
+        $prestamosRemate = $loansActiveAtDate->filter(function ($p) use ($fechaCorte) {
             $fInicio = Carbon::parse($p->fecha_prestamo);
             
             // Buscar último movimiento hasta la fecha de corte
             $ultimoPago = $p->pagos
-                ->where('fecha_pago', '<=', $to)
+                ->where('fecha_pago', '<=', $fechaCorte)
                 ->sortByDesc('fecha_pago')
                 ->first();
             
             $fechaReferencia = $ultimoPago ? Carbon::parse($ultimoPago->fecha_pago) : $fInicio;
             
-            // Estrictamente mayor o igual a 3 meses respecto a la fecha de corte ($to)
-            return $fechaReferencia->diffInMonths($to) >= 3;
+            $mesesSinPago = (int) $fechaReferencia->startOfDay()->diffInMonths($fechaCorte->copy()->startOfDay());
+
+            if ($mesesSinPago < 3) return false;
+
+            // Enriquecer con campos calculados para el frontend
+            $p->fecha_ultimo_pago   = $ultimoPago ? $ultimoPago->fecha_pago : null;
+            $p->dias_sin_pago       = (int) $fechaReferencia->startOfDay()->diffInDays($fechaCorte->copy()->startOfDay());
+            $p->meses_sin_pago      = $mesesSinPago;
+
+            return true;
         })->values();
 
         $carteraRemate = $prestamosRemate->sum('saldo_a_fecha');
@@ -307,44 +297,24 @@ class ReporteController extends Controller
         $data['cartera_vigente'] = $carteraVigente;
 
         // Configurar Título y Datos específicos según el tipo
-        switch ($tipo) {
-            case 'prestamos':
-                $data['titulo'] = 'Detalle de Préstamos Otorgados';
-                $data['listas']['prestamos'] = $listaPrestamos;
-                break;
-            case 'intereses':
-                $data['titulo'] = 'Detalle de Intereses Cobrados';
-                $data['listas']['intereses'] = $listaIntereses;
-                break;
-            case 'gastos':
-                $data['titulo'] = 'Detalle de Gastos Operativos';
-                $data['listas']['gastos'] = $listaGastos;
-                break;
-            case 'capital':
-                $data['titulo'] = 'Detalle de Capital Recuperado';
-                $data['listas']['capital'] = $listaCapital;
-                break;
-            case 'remate':
-                $data['titulo'] = 'Reporte de Préstamos en Remate';
-                // Mapear a objetos planos para garantizar que los atributos dinámicos lleguen al blade
-                $data['prestamosRemate'] = $prestamosRemate->map(function ($p) {
-                    return (object) [
-                        'codigo'            => $p->codigo,
-                        'cliente'           => (object) ['nombre' => $p->cliente->nombre ?? 'N/A'],
-                        'articulos'         => $p->articulos,
-                        'fecha_prestamo'    => $p->fecha_prestamo,
-                        'fecha_ultimo_pago' => $p->fecha_ultimo_pago,
-                        'dias_sin_pago'     => $p->dias_sin_pago,
-                        'meses_sin_pago'    => $p->meses_sin_pago,
-                        'saldo_a_fecha'     => $p->saldo_a_fecha,
-                        'monto'             => $p->monto,
-                        'pagos'             => $p->pagos,   // por si el blade lo necesita como fallback
-                    ];
-                });
-                break;
-            default: // resumen
-                $data['titulo'] = 'Resumen Financiero - Gestión de Ganancias';
-                break;
+        if ($tipo === 'remate' && isset($data['prestamosRemate'])) {
+            $data['prestamosRemate'] = collect($data['prestamosRemate'])->map(function ($p) {
+                return (object) [
+                    'codigo'            => $p['codigo'] ?? $p->codigo,
+                    'cliente'           => (object) [
+                        'nombre'   => $p['cliente_nombre'] ?? $p->cliente->nombre ?? 'N/A',
+                        'telefono' => $p['telefono'] ?? $p->cliente->telefono ?? 'N/A',
+                        'ci'       => $p['ci'] ?? $p->cliente->ci ?? 'N/A',
+                    ],
+                    'articulos'         => $p['articulos'] ?? $p->articulos ?? [],
+                    'fecha_prestamo'    => $p['fecha_prestamo'] ?? $p->fecha_prestamo,
+                    'fecha_ultimo_pago' => $p['fecha_ultimo_pago'] ?? $p->aging_data['ultimo_pago_fecha'] ?? null,
+                    'dias_sin_pago'     => $p['dias_sin_pago'] ?? $p->aging_data['dias_retraso'] ?? 0,
+                    'meses_sin_pago'    => $p['meses_sin_pago'] ?? $p->aging_data['meses_retraso'] ?? 0,
+                    'saldo_a_fecha'     => $p['saldo_a_fecha'] ?? $p->saldo_a_fecha ?? 0,
+                    'monto'             => $p['monto'] ?? $p->monto,
+                ];
+            });
         }
 
         $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pdf.reporte-financiero', $data);
@@ -410,14 +380,16 @@ class ReporteController extends Controller
         $listaCapital = $capitalQuery->get();
         $data['capital_recuperado'] = $listaCapital->sum('monto_pagado');
 
+        $fechaCorte = $to->isFuture() ? now() : $to->copy();
+
         $carteraTotalQuery = Prestamo::with(['cliente', 'pagos', 'articulos'])
-            ->where('fecha_prestamo', '<=', $to)
+            ->where('fecha_prestamo', '<=', $fechaCorte)
             ->get();
             
-        $loansActiveAtDate = $carteraTotalQuery->filter(function ($p) use ($to) {
+        $loansActiveAtDate = $carteraTotalQuery->filter(function ($p) use ($fechaCorte) {
             $capitalPagadoHastaFecha = $p->pagos
                 ->where('tipo_pago', 'Capital')
-                ->where('fecha_pago', '<=', $to)
+                ->where('fecha_pago', '<=', $fechaCorte)
                 ->sum('monto_pagado');
             $p->saldo_a_fecha = $p->monto - $capitalPagadoHastaFecha;
             return $p->saldo_a_fecha > 1;
@@ -425,9 +397,9 @@ class ReporteController extends Controller
 
         $carteraTotal = $loansActiveAtDate->sum('saldo_a_fecha');
         
-        $prestamosRemate = $loansActiveAtDate->filter(function ($p) use ($to) {
+        $prestamosRemate = $loansActiveAtDate->filter(function ($p) use ($fechaCorte) {
             $ultimoPago = $p->pagos
-                ->where('fecha_pago', '<=', $to)
+                ->where('fecha_pago', '<=', $fechaCorte)
                 ->sortByDesc('fecha_pago')
                 ->first();
 
@@ -435,13 +407,13 @@ class ReporteController extends Controller
                 ? Carbon::parse($ultimoPago->fecha_pago)
                 : Carbon::parse($p->fecha_prestamo);
 
-            $mesesSinPago = (int) $fechaReferencia->diffInMonths($to);
+            $mesesSinPago = (int) $fechaReferencia->startOfDay()->diffInMonths($fechaCorte->copy()->startOfDay());
 
             if ($mesesSinPago < 3) return false;
 
             // Enriquecer con campos para el blade (PDF y Excel)
             $p->fecha_ultimo_pago = $ultimoPago ? $ultimoPago->fecha_pago : null;
-            $p->dias_sin_pago     = (int) $fechaReferencia->diffInDays($to);
+            $p->dias_sin_pago     = (int) $fechaReferencia->startOfDay()->diffInDays($fechaCorte->copy()->startOfDay());
             $p->meses_sin_pago    = $mesesSinPago;
 
             return true;
@@ -479,7 +451,11 @@ class ReporteController extends Controller
                 $data['prestamosRemate'] = $prestamosRemate->map(function ($p) {
                     return (object) [
                         'codigo'           => $p->codigo,
-                        'cliente'          => (object) ['nombre' => $p->cliente->nombre ?? 'N/A'],
+                        'cliente'          => (object) [
+                            'nombre'   => $p->cliente->nombre ?? 'N/A',
+                            'telefono' => $p->cliente->telefono ?? 'N/A',
+                            'ci'       => $p->cliente->ci ?? 'N/A',
+                        ],
                         'articulos'        => $p->articulos,
                         'fecha_prestamo'   => $p->fecha_prestamo,
                         'fecha_ultimo_pago'=> $p->fecha_ultimo_pago,
